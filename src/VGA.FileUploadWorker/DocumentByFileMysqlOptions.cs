@@ -7,6 +7,15 @@ public sealed class DocumentByFileMysqlOptions
     /// <summary>Tabla destino (solo identificador seguro).</summary>
     public string TableName { get; set; } = "documentbyfile";
 
+    /// <summary>Columna PK numérica cuando la tabla no usa AUTO_INCREMENT.</summary>
+    public string IdColumnName { get; set; } = "Id";
+
+    /// <summary>
+    /// Si es true, asigna <see cref="IdColumnName"/> con COALESCE(MAX(Id),0)+1 en una transacción antes del INSERT.
+    /// Desactívelo si la columna Id es AUTO_INCREMENT y no debe enviarse en el INSERT.
+    /// </summary>
+    public bool GenerateIdUsingMaxPlusOne { get; set; } = true;
+
     public int LastUserUpdate { get; set; } = 111;
 
     public int IdLastUserUpdate { get; set; } = 111;

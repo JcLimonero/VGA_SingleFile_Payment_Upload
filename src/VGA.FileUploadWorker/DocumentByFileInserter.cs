@@ -42,43 +42,74 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         }
 
         var o = _docOptions.CurrentValue;
+        var idCol = o.IdColumnName.Trim();
+        if (o.GenerateIdUsingMaxPlusOne)
+        {
+            if (!SafeIdentifier.IsMatch(idCol))
+            {
+                _logger.LogError("DocumentByFile:IdColumnName no es un identificador válido: {Column}", idCol);
+                return false;
+            }
+        }
+
         var name = $"{o.NamePrefix}{originalFileName}";
         var now = DateTime.Now;
 
+        var insertColumns = o.GenerateIdUsingMaxPlusOne
+            ? $"`{idCol}`, Name, Comment, ExperationDate, PathDocument, Enabled, RegistrationDate, UpdateDate, LastUserUpdate, IdLastUserUpdate, IdFile, IdValidation, IdDocumentType, IdCurrentStatus, IdDocumentError, ServerPath, IdDocumentContainer"
+            : "Name, Comment, ExperationDate, PathDocument, Enabled, RegistrationDate, UpdateDate, LastUserUpdate, IdLastUserUpdate, IdFile, IdValidation, IdDocumentType, IdCurrentStatus, IdDocumentError, ServerPath, IdDocumentContainer";
+
+        var insertValues = o.GenerateIdUsingMaxPlusOne
+            ? "@idPk, @name, @comment, @expiration, @pathDoc, 1, @reg, @upd, @lastUser, @idLastUser, @idFile, @idValidation, @idDocType, @idStatus, @idErr, @serverPath, @idContainer"
+            : "@name, @comment, @expiration, @pathDoc, 1, @reg, @upd, @lastUser, @idLastUser, @idFile, @idValidation, @idDocType, @idStatus, @idErr, @serverPath, @idContainer";
+
         var sql = $"""
             INSERT INTO `{table}` (
-                Name, Comment, ExperationDate, PathDocument, Enabled,
-                RegistrationDate, UpdateDate, LastUserUpdate, IdLastUserUpdate,
-                IdFile, IdValidation, IdDocumentType, IdCurrentStatus, IdDocumentError,
-                ServerPath, IdDocumentContainer)
+                {insertColumns})
             VALUES (
-                @name, @comment, @expiration, @pathDoc, 1,
-                @reg, @upd, @lastUser, @idLastUser,
-                @idFile, @idValidation, @idDocType, @idStatus, @idErr,
-                @serverPath, @idContainer);
+                {insertValues});
+            """;
+
+        var nextIdSql = $"""
+            SELECT COALESCE(MAX(`{idCol}`), 0) + 1
+            FROM `{table}`;
             """;
 
         try
         {
             await using var conn = new MySqlConnection(cs);
             await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
-            await using var cmd = new MySqlCommand(sql, conn);
-            cmd.Parameters.AddWithValue("@name", name);
-            cmd.Parameters.AddWithValue("@comment", "");
-            cmd.Parameters.AddWithValue("@expiration", "");
-            cmd.Parameters.AddWithValue("@pathDoc", originalFileName);
-            cmd.Parameters.Add("@reg", MySqlDbType.DateTime).Value = now;
-            cmd.Parameters.Add("@upd", MySqlDbType.DateTime).Value = now;
-            cmd.Parameters.AddWithValue("@lastUser", o.LastUserUpdate);
-            cmd.Parameters.AddWithValue("@idLastUser", o.IdLastUserUpdate);
-            cmd.Parameters.AddWithValue("@idFile", idFile);
-            cmd.Parameters.AddWithValue("@idValidation", o.IdValidation);
-            cmd.Parameters.AddWithValue("@idDocType", o.IdDocumentType);
-            cmd.Parameters.AddWithValue("@idStatus", o.IdCurrentStatus);
-            cmd.Parameters.AddWithValue("@idErr", o.IdDocumentError);
-            cmd.Parameters.AddWithValue("@serverPath", o.ServerPath);
-            cmd.Parameters.AddWithValue("@idContainer", o.IdDocumentContainer);
-            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+
+            long? assignedId = null;
+            if (o.GenerateIdUsingMaxPlusOne)
+            {
+                await using (var tx = await conn.BeginTransactionAsync(cancellationToken).ConfigureAwait(false))
+                {
+                    await using (var nextCmd = new MySqlCommand(nextIdSql, conn, tx))
+                    {
+                        var scalar = await nextCmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+                        assignedId = Convert.ToInt64(scalar);
+                    }
+
+                    await using (var cmd = new MySqlCommand(sql, conn, tx))
+                    {
+                        cmd.Parameters.AddWithValue("@idPk", assignedId.Value);
+                        AddInsertParameters(cmd, name, originalFileName, now, idFile, o);
+                        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+                    }
+
+                    await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
+                }
+
+                return true;
+            }
+
+            await using (var cmd = new MySqlCommand(sql, conn))
+            {
+                AddInsertParameters(cmd, name, originalFileName, now, idFile, o);
+                await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             return true;
         }
         catch (Exception ex)
@@ -86,6 +117,25 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
             _logger.LogError(ex, "Error al insertar en documentbyfile para archivo {File}, IdFile={IdFile}", originalFileName, idFile);
             return false;
         }
+    }
+
+    private static void AddInsertParameters(MySqlCommand cmd, string name, string originalFileName, DateTime now, long idFile, DocumentByFileMysqlOptions o)
+    {
+        cmd.Parameters.AddWithValue("@name", name);
+        cmd.Parameters.AddWithValue("@comment", "");
+        cmd.Parameters.AddWithValue("@expiration", DBNull.Value);
+        cmd.Parameters.AddWithValue("@pathDoc", originalFileName);
+        cmd.Parameters.Add("@reg", MySqlDbType.DateTime).Value = now;
+        cmd.Parameters.Add("@upd", MySqlDbType.DateTime).Value = now;
+        cmd.Parameters.AddWithValue("@lastUser", o.LastUserUpdate);
+        cmd.Parameters.AddWithValue("@idLastUser", o.IdLastUserUpdate);
+        cmd.Parameters.AddWithValue("@idFile", idFile);
+        cmd.Parameters.AddWithValue("@idValidation", o.IdValidation);
+        cmd.Parameters.AddWithValue("@idDocType", o.IdDocumentType);
+        cmd.Parameters.AddWithValue("@idStatus", o.IdCurrentStatus);
+        cmd.Parameters.AddWithValue("@idErr", o.IdDocumentError);
+        cmd.Parameters.AddWithValue("@serverPath", o.ServerPath);
+        cmd.Parameters.AddWithValue("@idContainer", o.IdDocumentContainer);
     }
 
     private string? ResolveConnectionString()
