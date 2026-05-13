@@ -19,6 +19,11 @@ try
     builder.Services.AddSingleton<ISqliteConnectionProvider, SqliteConnectionProvider>();
     builder.Services.AddSingleton<IFileUploadRepository, SqliteFileUploadRepository>();
     builder.Services.AddSingleton<IFileObtainLogWriter, SqliteFileObtainLogWriter>();
+    builder.Services.AddSingleton<IPendingImportRetryStore, SqlitePendingImportRetryStore>();
+    builder.Services.Configure<DocumentRelationMysqlOptions>(builder.Configuration.GetSection(DocumentRelationMysqlOptions.SectionName));
+    builder.Services.Configure<DocumentByFileMysqlOptions>(builder.Configuration.GetSection(DocumentByFileMysqlOptions.SectionName));
+    builder.Services.AddSingleton<IDocumentRelationViewGate, DocumentRelationViewGate>();
+    builder.Services.AddSingleton<IDocumentByFileInserter, DocumentByFileInserter>();
     builder.Services.Configure<UploadOptions>(builder.Configuration.GetSection(UploadOptions.SectionName));
     builder.Services.AddHostedService<FolderUploadBackgroundService>();
 

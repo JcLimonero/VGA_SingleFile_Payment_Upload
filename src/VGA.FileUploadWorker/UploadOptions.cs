@@ -39,6 +39,12 @@ public sealed class UploadOptions
     /// </summary>
     public bool RequireValidPaymentFileName { get; set; }
 
+    /// <summary>
+    /// Minutos de espera antes de volver a intentar archivos que siguieron en el canal (vista sin fila, error MySQL, nombre sin parsear, etc.).
+    /// Los archivos nuevos (sin fila en esta tabla) se intentan en cada escaneo normal.
+    /// </summary>
+    public int RetryPendingIntervalMinutes { get; set; } = 30;
+
     public HashSet<string> ChannelNameSet(StringComparer comparer) =>
         new(ChannelFolderNames.Where(static s => !string.IsNullOrWhiteSpace(s)).Select(static s => s.Trim()), comparer);
 }

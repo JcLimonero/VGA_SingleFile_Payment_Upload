@@ -9,6 +9,9 @@ public sealed class FolderUploadBackgroundService : BackgroundService
     private readonly IFileUploadRepository _repository;
     private readonly IFileObtainLogWriter _obtainLog;
     private readonly ISqliteConnectionProvider _sqlite;
+    private readonly IDocumentRelationViewGate _documentGate;
+    private readonly IDocumentByFileInserter _documentByFile;
+    private readonly IPendingImportRetryStore _pendingRetry;
     private readonly UploadOptions _options;
 
     public FolderUploadBackgroundService(
@@ -16,12 +19,18 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         IFileUploadRepository repository,
         IFileObtainLogWriter obtainLog,
         ISqliteConnectionProvider sqlite,
+        IDocumentRelationViewGate documentGate,
+        IDocumentByFileInserter documentByFile,
+        IPendingImportRetryStore pendingRetry,
         IOptions<UploadOptions> options)
     {
         _logger = logger;
         _repository = repository;
         _obtainLog = obtainLog;
         _sqlite = sqlite;
+        _documentGate = documentGate;
+        _documentByFile = documentByFile;
+        _pendingRetry = pendingRetry;
         _options = options.Value;
     }
 
@@ -182,6 +191,9 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         var successDir = Path.Combine(channelDir, _options.SuccessSubfolder);
         var failureDir = Path.Combine(channelDir, _options.FailureSubfolder);
 
+        if (await _pendingRetry.ShouldDeferAsync(sourceRelativePath, cancellationToken).ConfigureAwait(false))
+            return;
+
         var parsed = PaymentFileNameParser.TryParse(name, out var agency, out var order);
         if (!parsed)
         {
@@ -212,6 +224,110 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                     cancellationToken).ConfigureAwait(false);
                 return;
             }
+
+            await _obtainLog.WriteAsync(
+                new FileObtainedLogEntry(
+                    name,
+                    sourceRelativePath,
+                    channel,
+                    null,
+                    null,
+                    ObtainOutcomes.SkippedUnparsedName,
+                    "Sin agencia y pedido en el nombre no se puede consultar view_upload_documents_relation.",
+                    null),
+                cancellationToken).ConfigureAwait(false);
+            await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.SkippedUnparsedName, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var lookup = await _documentGate.LookupRelatedRowAsync(agency!, order!, cancellationToken).ConfigureAwait(false);
+        switch (lookup.Verdict)
+        {
+            case DocumentRelationGateVerdict.MissingConfiguration:
+                await _obtainLog.WriteAsync(
+                    new FileObtainedLogEntry(
+                        name,
+                        sourceRelativePath,
+                        channel,
+                        agency,
+                        order,
+                        ObtainOutcomes.BlockedMissingMysqlConfig,
+                        "Configure ConnectionStrings:DocumentRelationMysql o DocumentRelationMysql:Password.",
+                        null),
+                    cancellationToken).ConfigureAwait(false);
+                await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.BlockedMissingMysqlConfig, cancellationToken).ConfigureAwait(false);
+                return;
+            case DocumentRelationGateVerdict.QueryError:
+                await _obtainLog.WriteAsync(
+                    new FileObtainedLogEntry(
+                        name,
+                        sourceRelativePath,
+                        channel,
+                        agency,
+                        order,
+                        ObtainOutcomes.BlockedMysqlError,
+                        "Error al consultar la vista en MySQL.",
+                        null),
+                    cancellationToken).ConfigureAwait(false);
+                await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.BlockedMysqlError, cancellationToken).ConfigureAwait(false);
+                return;
+            case DocumentRelationGateVerdict.NoRelatedRow:
+                _logger.LogInformation(
+                    "Sin fila en vista para abbreviation={Agency} order_dms={Order}; archivo sin mover: {File}",
+                    agency,
+                    order,
+                    sourceRelativePath);
+                await _obtainLog.WriteAsync(
+                    new FileObtainedLogEntry(
+                        name,
+                        sourceRelativePath,
+                        channel,
+                        agency,
+                        order,
+                        ObtainOutcomes.PendingNoRelatedRow,
+                        "No existe registro en view_upload_documents_relation para esta agencia y pedido.",
+                        null),
+                    cancellationToken).ConfigureAwait(false);
+                await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.PendingNoRelatedRow, cancellationToken).ConfigureAwait(false);
+                return;
+            case DocumentRelationGateVerdict.RelatedRowFound:
+                if (!lookup.IdFile.HasValue)
+                {
+                    await _obtainLog.WriteAsync(
+                        new FileObtainedLogEntry(
+                            name,
+                            sourceRelativePath,
+                            channel,
+                            agency,
+                            order,
+                            ObtainOutcomes.BlockedMysqlError,
+                            "La vista no devolvió IdFile.",
+                            null),
+                        cancellationToken).ConfigureAwait(false);
+                    await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.BlockedMysqlError, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                break;
+            default:
+                throw new InvalidOperationException($"Verdict no contemplado: {lookup.Verdict}");
+        }
+
+        if (!await _documentByFile.TryInsertAsync(name, lookup.IdFile!.Value, cancellationToken).ConfigureAwait(false))
+        {
+            await _obtainLog.WriteAsync(
+                new FileObtainedLogEntry(
+                    name,
+                    sourceRelativePath,
+                    channel,
+                    agency,
+                    order,
+                    ObtainOutcomes.BlockedDocumentByFileInsert,
+                    "No se pudo insertar en documentbyfile (MySQL).",
+                    null),
+                cancellationToken).ConfigureAwait(false);
+            await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.BlockedDocumentByFileInsert, cancellationToken).ConfigureAwait(false);
+            return;
         }
 
         byte[]? bytes = null;
@@ -254,9 +370,8 @@ public sealed class FolderUploadBackgroundService : BackgroundService
 
                 var storedAs = MoveToProcessedWithTimestamp(fullPath, successDir, id);
                 _logger.LogInformation("Archivo guardado en PROCESADOS como {StoredName}", Path.GetFileName(storedAs));
+                await _pendingRetry.ClearAsync(sourceRelativePath, cancellationToken).ConfigureAwait(false);
                 var importDetail = $"Guardado como: {Path.GetFileName(storedAs)}";
-                if (!parsed)
-                    importDetail += " (nombre sin patrón Agencia_pedido_)";
                 await _obtainLog.WriteAsync(
                     new FileObtainedLogEntry(
                         name,
@@ -317,6 +432,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                 "No se pudo abrir/leer el archivo tras reintentos.",
                 null),
             cancellationToken).ConfigureAwait(false);
+        await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.ReadRetriesExhausted, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<byte[]> ReadAllAsync(Stream stream, CancellationToken cancellationToken)

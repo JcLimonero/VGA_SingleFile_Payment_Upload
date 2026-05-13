@@ -30,3 +30,9 @@ CREATE TABLE IF NOT EXISTS FileObtainedLog (
 
 CREATE INDEX IF NOT EXISTS IX_FileObtainedLog_LogDate ON FileObtainedLog (LogDate);
 CREATE INDEX IF NOT EXISTS IX_FileObtainedLog_OccurredUtc ON FileObtainedLog (OccurredUtc);
+
+CREATE TABLE IF NOT EXISTS stalled_import_path (
+    source_relative_path TEXT NOT NULL PRIMARY KEY,
+    next_retry_utc TEXT NOT NULL,
+    last_outcome TEXT NOT NULL
+);
