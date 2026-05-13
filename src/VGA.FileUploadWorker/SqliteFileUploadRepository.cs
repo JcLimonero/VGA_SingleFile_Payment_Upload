@@ -45,4 +45,14 @@ public sealed class SqliteFileUploadRepository : IFileUploadRepository
         var result = await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
         return result is long id ? id : Convert.ToInt64(result, System.Globalization.CultureInfo.InvariantCulture);
     }
+
+    public async Task DeleteUploadByIdAsync(long id, CancellationToken cancellationToken)
+    {
+        await using var conn = new SqliteConnection(_provider.ConnectionString);
+        await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM PaymentFileUploads WHERE Id = @id;";
+        cmd.Parameters.AddWithValue("@id", id);
+        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
 }

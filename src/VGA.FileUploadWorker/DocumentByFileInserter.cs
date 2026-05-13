@@ -25,7 +25,7 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         _logger = logger;
     }
 
-    public async Task<bool> TryInsertAsync(string originalFileName, long idFile, CancellationToken cancellationToken)
+    public async Task<bool> TryInsertAsync(string originalFileName, string pathDocumentFileName, long idFile, CancellationToken cancellationToken)
     {
         var cs = ResolveConnectionString();
         if (string.IsNullOrWhiteSpace(cs))
@@ -94,7 +94,7 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
                     await using (var cmd = new MySqlCommand(sql, conn, tx))
                     {
                         cmd.Parameters.AddWithValue("@idPk", assignedId.Value);
-                        AddInsertParameters(cmd, name, originalFileName, now, idFile, o);
+                        AddInsertParameters(cmd, name, pathDocumentFileName, now, idFile, o);
                         await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
                     }
 
@@ -106,7 +106,7 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
 
             await using (var cmd = new MySqlCommand(sql, conn))
             {
-                AddInsertParameters(cmd, name, originalFileName, now, idFile, o);
+                AddInsertParameters(cmd, name, pathDocumentFileName, now, idFile, o);
                 await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
@@ -130,12 +130,12 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         return id;
     }
 
-    private static void AddInsertParameters(MySqlCommand cmd, string name, string originalFileName, DateTime now, long idFile, DocumentByFileMysqlOptions o)
+    private static void AddInsertParameters(MySqlCommand cmd, string name, string pathDocumentFileName, DateTime now, long idFile, DocumentByFileMysqlOptions o)
     {
         cmd.Parameters.AddWithValue("@name", name);
         cmd.Parameters.AddWithValue("@comment", "");
         cmd.Parameters.AddWithValue("@expiration", DBNull.Value);
-        cmd.Parameters.AddWithValue("@pathDoc", originalFileName);
+        cmd.Parameters.AddWithValue("@pathDoc", pathDocumentFileName);
         cmd.Parameters.Add("@reg", MySqlDbType.DateTime).Value = now;
         cmd.Parameters.Add("@upd", MySqlDbType.DateTime).Value = now;
         cmd.Parameters.AddWithValue("@lastUser", o.LastUserUpdate);
