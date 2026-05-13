@@ -13,9 +13,11 @@ public sealed class UploadOptions
     public List<string> ChannelFolderNames { get; set; } = new() { "EFECTIVO", "TPV" };
 
     /// <summary>Tras importar correctamente, el archivo se mueve a esta subcarpeta dentro del mismo canal.</summary>
+    /// <remarks>Se crea junto con <see cref="FailureSubfolder"/> si no existen.</remarks>
     public string SuccessSubfolder { get; set; } = "PROCESADOS";
 
     /// <summary>Si falla la importación, el archivo se mueve a esta subcarpeta dentro del mismo canal.</summary>
+    /// <remarks>Se crea junto con <see cref="SuccessSubfolder"/> si no existen.</remarks>
     public string FailureSubfolder { get; set; } = "CANCELADOS";
 
     /// <summary>Intervalo entre escaneos (segundos).</summary>

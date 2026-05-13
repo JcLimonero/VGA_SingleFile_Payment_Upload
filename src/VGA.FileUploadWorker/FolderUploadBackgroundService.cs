@@ -92,6 +92,8 @@ public sealed class FolderUploadBackgroundService : BackgroundService
             cancellationToken.ThrowIfCancellationRequested();
             var channelName = Path.GetFileName(channelDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
+            EnsureProcessedAndCancelledFolders(channelDir);
+
             IEnumerable<string> filesInChannel;
             try
             {
@@ -325,6 +327,24 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         using var sha = SHA256.Create();
         var h = await sha.ComputeHashAsync(stream, cancellationToken).ConfigureAwait(false);
         return h;
+    }
+
+    /// <summary>
+    /// Bajo cada EFECTIVO/TPV deben existir las carpetas de éxito y fallo; si faltan, se crean.
+    /// </summary>
+    private void EnsureProcessedAndCancelledFolders(string channelDir)
+    {
+        var processed = Path.Combine(channelDir, _options.SuccessSubfolder);
+        var cancelled = Path.Combine(channelDir, _options.FailureSubfolder);
+        try
+        {
+            Directory.CreateDirectory(processed);
+            Directory.CreateDirectory(cancelled);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudieron crear carpetas PROCESADOS/CANCELADOS bajo {Channel}", channelDir);
+        }
     }
 
     private void MoveWithUniqueName(string sourcePath, string destinationDirectory)
