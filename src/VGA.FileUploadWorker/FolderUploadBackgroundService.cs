@@ -252,7 +252,11 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                     hash,
                     cancellationToken).ConfigureAwait(false);
 
-                MoveWithUniqueName(fullPath, successDir);
+                var storedAs = MoveToProcessedWithTimestamp(fullPath, successDir, id);
+                _logger.LogInformation("Archivo guardado en PROCESADOS como {StoredName}", Path.GetFileName(storedAs));
+                var importDetail = $"Guardado como: {Path.GetFileName(storedAs)}";
+                if (!parsed)
+                    importDetail += " (nombre sin patrón Agencia_pedido_)";
                 await _obtainLog.WriteAsync(
                     new FileObtainedLogEntry(
                         name,
@@ -261,7 +265,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                         agency,
                         order,
                         ObtainOutcomes.Imported,
-                        parsed ? null : "Importado sin agencia/pedido parseados en el nombre",
+                        importDetail,
                         id),
                     cancellationToken).ConfigureAwait(false);
                 return;
@@ -345,6 +349,38 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         {
             _logger.LogWarning(ex, "No se pudieron crear carpetas PROCESADOS/CANCELADOS bajo {Channel}", channelDir);
         }
+    }
+
+    /// <summary>
+    /// Mueve a PROCESADOS renombrando: {nombre}_{yyyyMMdd_HHmmss_fff}_{idRegistro}.ext
+    /// para permitir el mismo nombre origen varias veces sin colisión.
+    /// </summary>
+    private static string MoveToProcessedWithTimestamp(string sourcePath, string destinationDirectory, long uploadId)
+    {
+        Directory.CreateDirectory(destinationDirectory);
+        var originalName = Path.GetFileName(sourcePath);
+        var stem = Path.GetFileNameWithoutExtension(originalName);
+        var ext = Path.GetExtension(originalName);
+        var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture);
+        var newName = $"{stem}_{stamp}_{uploadId}{ext}";
+        var dest = Path.Combine(destinationDirectory, newName);
+        if (!File.Exists(dest))
+        {
+            File.Move(sourcePath, dest, overwrite: false);
+            return dest;
+        }
+
+        for (var i = 1; i < 10_000; i++)
+        {
+            var alt = Path.Combine(destinationDirectory, $"{stem}_{stamp}_{uploadId}_{i:0000}{ext}");
+            if (!File.Exists(alt))
+            {
+                File.Move(sourcePath, alt, overwrite: false);
+                return alt;
+            }
+        }
+
+        throw new IOException($"No se encontró nombre libre al renombrar en PROCESADOS: {originalName}");
     }
 
     private void MoveWithUniqueName(string sourcePath, string destinationDirectory)
