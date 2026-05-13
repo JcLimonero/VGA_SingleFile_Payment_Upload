@@ -1,0 +1,64 @@
+## Build
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Dd]ist/
+[Aa]rtifacts/
+*.cache
+project.lock.json
+project.fragment.lock.json
+
+## Visual Studio / VS Code
+.vs/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.rsuser
+*.VC.db
+*.VC.VC.opendb
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+## Rider
+.idea/
+*.sln.iml
+
+## NuGet
+*.nupkg
+**/packages/*
+!**/packages/build/
+
+## Test / coverage
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+
+## User secrets & entornos locales
+**/appsettings.*.local.json
+**/secrets.json
+
+## SQLite / datos locales del worker (opcional: quitar la línea si quieres versionar una BD de ejemplo)
+*.db
+*.db-shm
+*.db-wal
+
+## OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+## Otros
+*.log
+*.tmp
+*.temp
+*.swp
+*~

@@ -10,7 +10,7 @@ public sealed class UploadOptions
     /// <summary>
     /// Nombres de carpeta “canal” donde pueden aparecer archivos pendientes (solo en el nivel raíz de esa carpeta, no dentro de subcarpetas).
     /// </summary>
-    public List<string> ChannelFolderNames { get; set; } = ["EFECTIVO", "TPV"];
+    public List<string> ChannelFolderNames { get; set; } = new() { "EFECTIVO", "TPV" };
 
     /// <summary>Tras importar correctamente, el archivo se mueve a esta subcarpeta dentro del mismo canal.</summary>
     public string SuccessSubfolder { get; set; } = "PROCESADOS";

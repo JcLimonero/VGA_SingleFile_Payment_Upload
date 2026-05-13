@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("VGA.FileUploadWorker")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+487d3738e2cb5f53f74fd39f8ba9258ff0e0193f")]
 [assembly: System.Reflection.AssemblyProductAttribute("VGA.FileUploadWorker")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VGA.FileUploadWorker")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
