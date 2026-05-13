@@ -92,8 +92,24 @@ public sealed class FolderUploadBackgroundService : BackgroundService
             cancellationToken.ThrowIfCancellationRequested();
             var channelName = Path.GetFileName(channelDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
-            foreach (var fullPath in Directory.EnumerateFiles(channelDir, _options.FileSearchPattern, SearchOption.TopDirectoryOnly)
-                         .OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+            IEnumerable<string> filesInChannel;
+            try
+            {
+                filesInChannel = Directory.EnumerateFiles(channelDir, _options.FileSearchPattern, SearchOption.TopDirectoryOnly)
+                    .OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning(ex, "Sin acceso para listar archivos en canal: {Path}", channelDir);
+                continue;
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning(ex, "No se pudo listar archivos en canal: {Path}", channelDir);
+                continue;
+            }
+
+            foreach (var fullPath in filesInChannel)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var relative = Path.GetRelativePath(root, fullPath);
@@ -102,16 +118,55 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         }
     }
 
-    private static IEnumerable<string> EnumerateChannelDirectories(string root, HashSet<string> channels)
+    /// <summary>
+    /// Recorre el árbol desde la raíz sin usar AllDirectories (evita fallar en System Volume Information, etc.).
+    /// </summary>
+    private IEnumerable<string> EnumerateChannelDirectories(string root, HashSet<string> channels)
     {
-        foreach (var dir in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories))
+        root = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var queue = new Queue<string>();
+        queue.Enqueue(root);
+
+        while (queue.Count > 0)
         {
-            var leaf = Path.GetFileName(dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            if (leaf.Length == 0 || !channels.Contains(leaf))
+            var current = queue.Dequeue();
+            string[] children;
+            try
+            {
+                children = Directory.GetDirectories(current);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogDebug(ex, "Sin acceso al listar subcarpetas, se omite: {Path}", current);
                 continue;
-            yield return dir;
+            }
+            catch (IOException ex)
+            {
+                _logger.LogDebug(ex, "No se pudieron listar subcarpetas, se omite: {Path}", current);
+                continue;
+            }
+
+            foreach (var child in children)
+            {
+                var trimmed = child.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var leaf = Path.GetFileName(trimmed);
+                if (leaf.Length == 0)
+                    continue;
+                if (IsSkippableSystemDirectory(leaf))
+                    continue;
+
+                if (channels.Contains(leaf))
+                    yield return child;
+
+                queue.Enqueue(child);
+            }
         }
     }
+
+    private static bool IsSkippableSystemDirectory(string directoryName) =>
+        directoryName.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase)
+        || directoryName.Equals("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase)
+        || directoryName.Equals("Recovery", StringComparison.OrdinalIgnoreCase);
 
     private async Task TryProcessOneFileAsync(
         string fullPath,
