@@ -20,9 +20,9 @@ public sealed class DocumentByFileMysqlOptions
 
     public int IdLastUserUpdate { get; set; } = 111;
 
-    public string IdValidation { get; set; } = "21";
+    public string IdValidation { get; set; } = "";
 
-    public int IdDocumentType { get; set; } = 1;
+    public int IdDocumentType { get; set; } = 21;
 
     public int IdCurrentStatus { get; set; } = 0;
 
