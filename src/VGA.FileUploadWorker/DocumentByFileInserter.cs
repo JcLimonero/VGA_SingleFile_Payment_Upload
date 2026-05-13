@@ -119,6 +119,14 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         }
     }
 
+    /// <summary>0 y ausencia de valor suelen significar “sin error”; 0 no cumple FK en muchas bases.</summary>
+    private static object ResolveIdDocumentErrorParameter(DocumentByFileMysqlOptions o)
+    {
+        if (!o.IdDocumentError.HasValue || o.IdDocumentError.Value == 0)
+            return DBNull.Value;
+        return o.IdDocumentError.Value;
+    }
+
     private static void AddInsertParameters(MySqlCommand cmd, string name, string originalFileName, DateTime now, long idFile, DocumentByFileMysqlOptions o)
     {
         cmd.Parameters.AddWithValue("@name", name);
@@ -133,7 +141,7 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         cmd.Parameters.AddWithValue("@idValidation", o.IdValidation);
         cmd.Parameters.AddWithValue("@idDocType", o.IdDocumentType);
         cmd.Parameters.AddWithValue("@idStatus", o.IdCurrentStatus);
-        cmd.Parameters.AddWithValue("@idErr", o.IdDocumentError);
+        cmd.Parameters.AddWithValue("@idErr", ResolveIdDocumentErrorParameter(o));
         cmd.Parameters.AddWithValue("@serverPath", o.ServerPath);
         cmd.Parameters.AddWithValue("@idContainer", o.IdDocumentContainer);
     }

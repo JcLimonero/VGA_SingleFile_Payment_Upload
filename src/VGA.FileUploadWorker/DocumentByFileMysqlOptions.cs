@@ -26,7 +26,11 @@ public sealed class DocumentByFileMysqlOptions
 
     public int IdCurrentStatus { get; set; } = 0;
 
-    public int IdDocumentError { get; set; } = 0;
+    /// <summary>
+    /// FK a documentfile_error.Id. Use null o 0 en configuración para insertar SQL NULL (sin error), si la columna lo permite.
+    /// Si la columna es NOT NULL, asigne aquí un Id válido existente en documentfile_error.
+    /// </summary>
+    public int? IdDocumentError { get; set; }
 
     public string ServerPath { get; set; } = "";
 
