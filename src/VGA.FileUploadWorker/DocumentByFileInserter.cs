@@ -119,12 +119,15 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         }
     }
 
-    /// <summary>0 y ausencia de valor suelen significar “sin error”; 0 no cumple FK en muchas bases.</summary>
+    /// <summary>Vacío, "0" o no numérico → NULL (evita FK a documentfile_error con Id inexistente).</summary>
     private static object ResolveIdDocumentErrorParameter(DocumentByFileMysqlOptions o)
     {
-        if (!o.IdDocumentError.HasValue || o.IdDocumentError.Value == 0)
+        var s = o.IdDocumentError?.Trim();
+        if (string.IsNullOrEmpty(s) || s == "0")
             return DBNull.Value;
-        return o.IdDocumentError.Value;
+        if (!int.TryParse(s, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var id))
+            return DBNull.Value;
+        return id;
     }
 
     private static void AddInsertParameters(MySqlCommand cmd, string name, string originalFileName, DateTime now, long idFile, DocumentByFileMysqlOptions o)
