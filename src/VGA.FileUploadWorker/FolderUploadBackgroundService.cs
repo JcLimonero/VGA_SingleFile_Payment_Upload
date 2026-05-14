@@ -408,6 +408,11 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                 var outcome = ObtainOutcomes.Imported;
                 if (_backblazeOptions.CurrentValue.Enabled)
                 {
+                    _logger.LogInformation(
+                        "Enviando archivo por API Backblaze: ruta={Path}, idSingleFile={IdFile}, idDocumentFile={IdDoc}",
+                        storedAs,
+                        lookup.IdFile!.Value,
+                        documentByFileId);
                     var (uploadOk, uploadErr) = await _backblazeUpload
                         .UploadAsync(destPath, lookup.IdFile!.Value, documentByFileId, cancellationToken)
                         .ConfigureAwait(false);
@@ -417,6 +422,16 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                         outcome = ObtainOutcomes.FailedBackblazeUpload;
                         importDetail = $"{importDetail}; Backblaze: {uploadErr}";
                     }
+                    else
+                    {
+                        importDetail = $"{importDetail}; Backblaze: subida OK";
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "BackblazeUpload.Enabled=false: no se llama al API; archivo solo en disco: {File}",
+                        Path.GetFileName(storedAs));
                 }
 
                 await _obtainLog.WriteAsync(
