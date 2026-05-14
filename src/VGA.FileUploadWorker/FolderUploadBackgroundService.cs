@@ -11,6 +11,8 @@ public sealed class FolderUploadBackgroundService : BackgroundService
     private readonly ISqliteConnectionProvider _sqlite;
     private readonly IDocumentRelationViewGate _documentGate;
     private readonly IDocumentByFileInserter _documentByFile;
+    private readonly IBackblazeUploadClient _backblazeUpload;
+    private readonly IOptionsMonitor<BackblazeUploadOptions> _backblazeOptions;
     private readonly IPendingImportRetryStore _pendingRetry;
     private readonly UploadOptions _options;
 
@@ -21,6 +23,8 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         ISqliteConnectionProvider sqlite,
         IDocumentRelationViewGate documentGate,
         IDocumentByFileInserter documentByFile,
+        IBackblazeUploadClient backblazeUpload,
+        IOptionsMonitor<BackblazeUploadOptions> backblazeOptions,
         IPendingImportRetryStore pendingRetry,
         IOptions<UploadOptions> options)
     {
@@ -30,6 +34,8 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         _sqlite = sqlite;
         _documentGate = documentGate;
         _documentByFile = documentByFile;
+        _backblazeUpload = backblazeUpload;
+        _backblazeOptions = backblazeOptions;
         _pendingRetry = pendingRetry;
         _options = options.Value;
     }
@@ -353,7 +359,8 @@ public sealed class FolderUploadBackgroundService : BackgroundService
 
                 var (destPath, destFileName) = ResolveProcessedDestination(fullPath, successDir, id);
 
-                if (!await _documentByFile.TryInsertAsync(name, destFileName, lookup.IdFile!.Value, cancellationToken).ConfigureAwait(false))
+                var insertResult = await _documentByFile.TryInsertAsync(name, destFileName, lookup.IdFile!.Value, cancellationToken).ConfigureAwait(false);
+                if (!insertResult.Ok)
                 {
                     await _repository.DeleteUploadByIdAsync(id, cancellationToken).ConfigureAwait(false);
                     await _obtainLog.WriteAsync(
@@ -371,11 +378,47 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                     return;
                 }
 
+                if (!insertResult.DocumentByFileId.HasValue)
+                {
+                    await _repository.DeleteUploadByIdAsync(id, cancellationToken).ConfigureAwait(false);
+                    _logger.LogError("documentbyfile insertó sin devolver Id; se revierte SQLite para {File}", name);
+                    await _obtainLog.WriteAsync(
+                        new FileObtainedLogEntry(
+                            name,
+                            sourceRelativePath,
+                            channel,
+                            agency,
+                            order,
+                            ObtainOutcomes.BlockedDocumentByFileInsert,
+                            "Insert en documentbyfile sin Id devuelto.",
+                            null),
+                        cancellationToken).ConfigureAwait(false);
+                    await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.BlockedDocumentByFileInsert, cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
+                var documentByFileId = insertResult.DocumentByFileId.Value;
+
                 File.Move(fullPath, destPath, overwrite: false);
                 var storedAs = destPath;
                 _logger.LogInformation("Archivo guardado en PROCESADOS como {StoredName}", Path.GetFileName(storedAs));
                 await _pendingRetry.ClearAsync(sourceRelativePath, cancellationToken).ConfigureAwait(false);
+
                 var importDetail = $"Guardado como: {Path.GetFileName(storedAs)}";
+                var outcome = ObtainOutcomes.Imported;
+                if (_backblazeOptions.CurrentValue.Enabled)
+                {
+                    var (uploadOk, uploadErr) = await _backblazeUpload
+                        .UploadAsync(destPath, lookup.IdFile!.Value, documentByFileId, cancellationToken)
+                        .ConfigureAwait(false);
+                    if (!uploadOk)
+                    {
+                        _logger.LogError("Fallo subida Backblaze para {File}: {Detail}", Path.GetFileName(storedAs), uploadErr);
+                        outcome = ObtainOutcomes.FailedBackblazeUpload;
+                        importDetail = $"{importDetail}; Backblaze: {uploadErr}";
+                    }
+                }
+
                 await _obtainLog.WriteAsync(
                     new FileObtainedLogEntry(
                         name,
@@ -383,7 +426,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                         channel,
                         agency,
                         order,
-                        ObtainOutcomes.Imported,
+                        outcome,
                         importDetail,
                         id),
                     cancellationToken).ConfigureAwait(false);

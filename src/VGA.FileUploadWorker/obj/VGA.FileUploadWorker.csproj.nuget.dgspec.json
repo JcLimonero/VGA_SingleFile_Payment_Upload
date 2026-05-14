@@ -65,6 +65,10 @@
               "target": "Package",
               "version": "[7.0.0, )"
             },
+            "Microsoft.Extensions.Http": {
+              "target": "Package",
+              "version": "[7.0.0, )"
+            },
             "MySqlConnector": {
               "target": "Package",
               "version": "[2.3.7, )"

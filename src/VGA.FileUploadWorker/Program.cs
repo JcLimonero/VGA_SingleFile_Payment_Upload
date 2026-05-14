@@ -1,4 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Serilog;
 using VGA.FileUploadWorker;
 
@@ -22,6 +24,14 @@ try
     builder.Services.AddSingleton<IPendingImportRetryStore, SqlitePendingImportRetryStore>();
     builder.Services.Configure<DocumentRelationMysqlOptions>(builder.Configuration.GetSection(DocumentRelationMysqlOptions.SectionName));
     builder.Services.Configure<DocumentByFileMysqlOptions>(builder.Configuration.GetSection(DocumentByFileMysqlOptions.SectionName));
+    builder.Services.Configure<BackblazeUploadOptions>(builder.Configuration.GetSection(BackblazeUploadOptions.SectionName));
+    builder.Services.AddHttpClient(BackblazeUploadClient.HttpClientName, (sp, client) =>
+    {
+        var o = sp.GetRequiredService<IOptions<BackblazeUploadOptions>>().Value;
+        var seconds = Math.Clamp(o.TimeoutSeconds, 5, 600);
+        client.Timeout = TimeSpan.FromSeconds(seconds);
+    });
+    builder.Services.AddSingleton<IBackblazeUploadClient, BackblazeUploadClient>();
     builder.Services.AddSingleton<IDocumentRelationViewGate, DocumentRelationViewGate>();
     builder.Services.AddSingleton<IDocumentByFileInserter, DocumentByFileInserter>();
     builder.Services.Configure<UploadOptions>(builder.Configuration.GetSection(UploadOptions.SectionName));

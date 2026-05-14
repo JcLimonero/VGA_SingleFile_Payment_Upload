@@ -25,20 +25,24 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         _logger = logger;
     }
 
-    public async Task<bool> TryInsertAsync(string originalFileName, string pathDocumentFileName, long idFile, CancellationToken cancellationToken)
+    public async Task<DocumentByFileInsertResult> TryInsertAsync(
+        string originalFileName,
+        string pathDocumentFileName,
+        long idFile,
+        CancellationToken cancellationToken)
     {
         var cs = ResolveConnectionString();
         if (string.IsNullOrWhiteSpace(cs))
         {
             _logger.LogError("DocumentByFile: sin cadena MySQL; no se inserta documentbyfile.");
-            return false;
+            return new DocumentByFileInsertResult(false, null);
         }
 
         var table = _docOptions.CurrentValue.TableName.Trim();
         if (!SafeIdentifier.IsMatch(table))
         {
             _logger.LogError("DocumentByFile:TableName no es un identificador válido: {Table}", table);
-            return false;
+            return new DocumentByFileInsertResult(false, null);
         }
 
         var o = _docOptions.CurrentValue;
@@ -48,7 +52,7 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
             if (!SafeIdentifier.IsMatch(idCol))
             {
                 _logger.LogError("DocumentByFile:IdColumnName no es un identificador válido: {Column}", idCol);
-                return false;
+                return new DocumentByFileInsertResult(false, null);
             }
         }
 
@@ -101,21 +105,30 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
                     await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
                 }
 
-                return true;
+                return new DocumentByFileInsertResult(true, assignedId!.Value);
             }
 
+            long insertedId;
             await using (var cmd = new MySqlCommand(sql, conn))
             {
                 AddInsertParameters(cmd, name, pathDocumentFileName, now, idFile, o);
                 await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            return true;
+            await using (var lidCmd = new MySqlCommand("SELECT LAST_INSERT_ID();", conn))
+            {
+                var scalar = await lidCmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+                if (scalar is null or DBNull)
+                    return new DocumentByFileInsertResult(false, null);
+                insertedId = scalar is ulong u ? unchecked((long)u) : Convert.ToInt64(scalar, System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            return new DocumentByFileInsertResult(true, insertedId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error al insertar en documentbyfile para archivo {File}, IdFile={IdFile}", originalFileName, idFile);
-            return false;
+            return new DocumentByFileInsertResult(false, null);
         }
     }
 

@@ -16,6 +16,8 @@ public static class ObtainOutcomes
     public const string BlockedMysqlError = "BlockedMysqlError";
     /// <summary>Error al insertar en documentbyfile tras encontrar fila en la vista.</summary>
     public const string BlockedDocumentByFileInsert = "BlockedDocumentByFileInsert";
+    /// <summary>Archivo en PROCESADOS pero falló la subida al API Backblaze.</summary>
+    public const string FailedBackblazeUpload = "FailedBackblazeUpload";
 }
 
 public sealed record FileObtainedLogEntry(

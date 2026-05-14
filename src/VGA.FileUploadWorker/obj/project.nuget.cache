@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "9HvVxBfXwls=",
+  "dgSpecHash": "fm/R+e0h2EI=",
   "success": true,
   "projectFilePath": "d:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj",
   "expectedPackageFiles": [
@@ -23,6 +23,7 @@
     "C:\\Users\\JCLimon\\.nuget\\packages\\microsoft.extensions.hosting\\7.0.0\\microsoft.extensions.hosting.7.0.0.nupkg.sha512",
     "C:\\Users\\JCLimon\\.nuget\\packages\\microsoft.extensions.hosting.abstractions\\7.0.0\\microsoft.extensions.hosting.abstractions.7.0.0.nupkg.sha512",
     "C:\\Users\\JCLimon\\.nuget\\packages\\microsoft.extensions.hosting.windowsservices\\7.0.0\\microsoft.extensions.hosting.windowsservices.7.0.0.nupkg.sha512",
+    "C:\\Users\\JCLimon\\.nuget\\packages\\microsoft.extensions.http\\7.0.0\\microsoft.extensions.http.7.0.0.nupkg.sha512",
     "C:\\Users\\JCLimon\\.nuget\\packages\\microsoft.extensions.logging\\7.0.0\\microsoft.extensions.logging.7.0.0.nupkg.sha512",
     "C:\\Users\\JCLimon\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\7.0.1\\microsoft.extensions.logging.abstractions.7.0.1.nupkg.sha512",
     "C:\\Users\\JCLimon\\.nuget\\packages\\microsoft.extensions.logging.configuration\\7.0.0\\microsoft.extensions.logging.configuration.7.0.0.nupkg.sha512",
