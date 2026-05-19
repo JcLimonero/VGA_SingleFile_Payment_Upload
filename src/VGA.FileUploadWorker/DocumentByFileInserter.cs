@@ -8,19 +8,16 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
 {
     private static readonly Regex SafeIdentifier = new("^[A-Za-z][A-Za-z0-9_]{0,127}$", RegexOptions.Compiled);
 
-    private readonly IConfiguration _configuration;
-    private readonly IOptionsMonitor<DocumentRelationMysqlOptions> _mysqlOptions;
+    private readonly IDocumentRelationMysqlConnectionProvider _mysqlConnection;
     private readonly IOptionsMonitor<DocumentByFileMysqlOptions> _docOptions;
     private readonly ILogger<DocumentByFileInserter> _logger;
 
     public DocumentByFileInserter(
-        IConfiguration configuration,
-        IOptionsMonitor<DocumentRelationMysqlOptions> mysqlOptions,
+        IDocumentRelationMysqlConnectionProvider mysqlConnection,
         IOptionsMonitor<DocumentByFileMysqlOptions> docOptions,
         ILogger<DocumentByFileInserter> logger)
     {
-        _configuration = configuration;
-        _mysqlOptions = mysqlOptions;
+        _mysqlConnection = mysqlConnection;
         _docOptions = docOptions;
         _logger = logger;
     }
@@ -31,7 +28,7 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         long idFile,
         CancellationToken cancellationToken)
     {
-        var cs = ResolveConnectionString();
+        var cs = _mysqlConnection.GetConnectionString();
         if (string.IsNullOrWhiteSpace(cs))
         {
             _logger.LogError("DocumentByFile: sin cadena MySQL; no se inserta documentbyfile.");
@@ -162,26 +159,4 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         cmd.Parameters.AddWithValue("@idContainer", o.IdDocumentContainer);
     }
 
-    private string? ResolveConnectionString()
-    {
-        var full = _configuration.GetConnectionString("DocumentRelationMysql");
-        if (!string.IsNullOrWhiteSpace(full))
-            return full.Trim();
-
-        var o = _mysqlOptions.CurrentValue;
-        if (string.IsNullOrWhiteSpace(o.Server) || string.IsNullOrWhiteSpace(o.Database)
-                                               || string.IsNullOrWhiteSpace(o.UserId)
-                                               || string.IsNullOrWhiteSpace(o.Password))
-            return null;
-
-        var b = new MySqlConnectionStringBuilder
-        {
-            Server = o.Server,
-            Port = o.Port,
-            Database = o.Database,
-            UserID = o.UserId,
-            Password = o.Password,
-        };
-        return b.ConnectionString;
-    }
 }

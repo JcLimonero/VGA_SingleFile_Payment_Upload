@@ -33,6 +33,9 @@ try
     });
     builder.Services.AddSingleton<IBackblazeUploadClient, BackblazeUploadClient>();
     builder.Services.AddSingleton<IDocumentRelationViewGate, DocumentRelationViewGate>();
+    builder.Services.AddSingleton<IDocumentRelationMysqlConnectionProvider, DocumentRelationMysqlConnectionProvider>();
+    builder.Services.Configure<DocumentPaymentUploadMysqlOptions>(builder.Configuration.GetSection(DocumentPaymentUploadMysqlOptions.SectionName));
+    builder.Services.AddSingleton<IDocumentPaymentUploadTracker, DocumentPaymentUploadTracker>();
     builder.Services.AddSingleton<IDocumentByFileInserter, DocumentByFileInserter>();
     builder.Services.Configure<UploadOptions>(builder.Configuration.GetSection(UploadOptions.SectionName));
     builder.Services.AddHostedService<FolderUploadBackgroundService>();

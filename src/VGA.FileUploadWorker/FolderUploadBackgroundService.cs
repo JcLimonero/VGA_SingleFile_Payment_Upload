@@ -13,6 +13,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
     private readonly IDocumentByFileInserter _documentByFile;
     private readonly IBackblazeUploadClient _backblazeUpload;
     private readonly IOptionsMonitor<BackblazeUploadOptions> _backblazeOptions;
+    private readonly IDocumentPaymentUploadTracker _documentPaymentUpload;
     private readonly IPendingImportRetryStore _pendingRetry;
     private readonly UploadOptions _options;
 
@@ -25,6 +26,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         IDocumentByFileInserter documentByFile,
         IBackblazeUploadClient backblazeUpload,
         IOptionsMonitor<BackblazeUploadOptions> backblazeOptions,
+        IDocumentPaymentUploadTracker documentPaymentUpload,
         IPendingImportRetryStore pendingRetry,
         IOptions<UploadOptions> options)
     {
@@ -36,6 +38,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         _documentByFile = documentByFile;
         _backblazeUpload = backblazeUpload;
         _backblazeOptions = backblazeOptions;
+        _documentPaymentUpload = documentPaymentUpload;
         _pendingRetry = pendingRetry;
         _options = options.Value;
     }
@@ -322,6 +325,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         byte[]? bytes = null;
         byte[]? hash = null;
 
+        long? trackingId = null;
         for (var attempt = 1; attempt <= 5; attempt++)
         {
             try
@@ -357,11 +361,29 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                     hash,
                     cancellationToken).ConfigureAwait(false);
 
+                trackingId = await _documentPaymentUpload.InsertRowAfterSqliteAsync(
+                    sourceRelativePath,
+                    channel,
+                    name,
+                    agency,
+                    order,
+                    lookup.IdFile!.Value,
+                    id,
+                    cancellationToken).ConfigureAwait(false);
+
                 var (destPath, destFileName) = ResolveProcessedDestination(fullPath, successDir, id);
 
                 var insertResult = await _documentByFile.TryInsertAsync(name, destFileName, lookup.IdFile!.Value, cancellationToken).ConfigureAwait(false);
                 if (!insertResult.Ok)
                 {
+                    if (trackingId.HasValue)
+                    {
+                        await _documentPaymentUpload.MarkProcessFailedAsync(
+                            trackingId.Value,
+                            "No se pudo insertar en documentbyfile (MySQL).",
+                            cancellationToken).ConfigureAwait(false);
+                    }
+
                     await _repository.DeleteUploadByIdAsync(id, cancellationToken).ConfigureAwait(false);
                     await _obtainLog.WriteAsync(
                         new FileObtainedLogEntry(
@@ -380,6 +402,14 @@ public sealed class FolderUploadBackgroundService : BackgroundService
 
                 if (!insertResult.DocumentByFileId.HasValue)
                 {
+                    if (trackingId.HasValue)
+                    {
+                        await _documentPaymentUpload.MarkProcessFailedAsync(
+                            trackingId.Value,
+                            "Insert en documentbyfile sin Id devuelto.",
+                            cancellationToken).ConfigureAwait(false);
+                    }
+
                     await _repository.DeleteUploadByIdAsync(id, cancellationToken).ConfigureAwait(false);
                     _logger.LogError("documentbyfile insertó sin devolver Id; se revierte SQLite para {File}", name);
                     await _obtainLog.WriteAsync(
@@ -399,10 +429,20 @@ public sealed class FolderUploadBackgroundService : BackgroundService
 
                 var documentByFileId = insertResult.DocumentByFileId.Value;
 
+                if (trackingId.HasValue)
+                {
+                    await _documentPaymentUpload.MarkDocumentByFileAsync(trackingId.Value, documentByFileId, cancellationToken).ConfigureAwait(false);
+                }
+
                 File.Move(fullPath, destPath, overwrite: false);
                 var storedAs = destPath;
                 _logger.LogInformation("Archivo guardado en PROCESADOS como {StoredName}", Path.GetFileName(storedAs));
                 await _pendingRetry.ClearAsync(sourceRelativePath, cancellationToken).ConfigureAwait(false);
+
+                if (trackingId.HasValue)
+                {
+                    await _documentPaymentUpload.MarkProcessedAsync(trackingId.Value, storedAs, destFileName, cancellationToken).ConfigureAwait(false);
+                }
 
                 var importDetail = $"Guardado como: {Path.GetFileName(storedAs)}";
                 var outcome = ObtainOutcomes.Imported;
@@ -413,9 +453,19 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                         storedAs,
                         lookup.IdFile!.Value,
                         documentByFileId);
+                    if (trackingId.HasValue)
+                    {
+                        await _documentPaymentUpload.NotifyCloudAttemptStartingAsync(trackingId.Value, cancellationToken).ConfigureAwait(false);
+                    }
+
                     var (uploadOk, uploadErr) = await _backblazeUpload
                         .UploadAsync(destPath, lookup.IdFile!.Value, documentByFileId, cancellationToken)
                         .ConfigureAwait(false);
+                    if (trackingId.HasValue)
+                    {
+                        await _documentPaymentUpload.MarkCloudOutcomeAsync(trackingId.Value, uploadOk, uploadErr, cancellationToken).ConfigureAwait(false);
+                    }
+
                     if (!uploadOk)
                     {
                         _logger.LogError("Fallo subida Backblaze para {File}: {Detail}", Path.GetFileName(storedAs), uploadErr);
@@ -457,6 +507,11 @@ public sealed class FolderUploadBackgroundService : BackgroundService
             }
             catch (Exception ex)
             {
+                if (trackingId.HasValue)
+                {
+                    await _documentPaymentUpload.MarkProcessFailedAsync(trackingId.Value, ex.Message, cancellationToken).ConfigureAwait(false);
+                }
+
                 _logger.LogError(ex, "Fallo al procesar {File}; se moverá a {Folder}.", sourceRelativePath, _options.FailureSubfolder);
                 try
                 {
