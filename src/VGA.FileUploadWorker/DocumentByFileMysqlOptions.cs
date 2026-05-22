@@ -38,4 +38,7 @@ public sealed class DocumentByFileMysqlOptions
 
     /// <summary>Prefijo del campo Name, p. ej. Liquidacion_.</summary>
     public string NamePrefix { get; set; } = "Liquidacion_";
+
+    /// <summary>Si es true, al escanear CORRECCION se desactiva documentbyfile por PathDocument.</summary>
+    public bool DisableOnCorreccionScan { get; set; } = true;
 }

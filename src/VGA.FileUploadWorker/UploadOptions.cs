@@ -18,7 +18,7 @@ public sealed class UploadOptions
 
     /// <summary>Si falla la importación, el archivo se mueve a esta subcarpeta dentro del mismo canal.</summary>
     /// <remarks>Se crea junto con <see cref="SuccessSubfolder"/> si no existen.</remarks>
-    public string FailureSubfolder { get; set; } = "CANCELADOS";
+    public string FailureSubfolder { get; set; } = "CORRECCION";
 
     /// <summary>Intervalo entre escaneos (segundos).</summary>
     public int ScanIntervalSeconds { get; set; } = 10;

@@ -14,6 +14,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
     private readonly IBackblazeUploadClient _backblazeUpload;
     private readonly IOptionsMonitor<BackblazeUploadOptions> _backblazeOptions;
     private readonly IDocumentPaymentUploadTracker _documentPaymentUpload;
+    private readonly IDocumentByFileCorreccionService _documentCorreccion;
     private readonly IPendingImportRetryStore _pendingRetry;
     private readonly UploadOptions _options;
 
@@ -27,6 +28,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         IBackblazeUploadClient backblazeUpload,
         IOptionsMonitor<BackblazeUploadOptions> backblazeOptions,
         IDocumentPaymentUploadTracker documentPaymentUpload,
+        IDocumentByFileCorreccionService documentCorreccion,
         IPendingImportRetryStore pendingRetry,
         IOptions<UploadOptions> options)
     {
@@ -39,6 +41,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         _backblazeUpload = backblazeUpload;
         _backblazeOptions = backblazeOptions;
         _documentPaymentUpload = documentPaymentUpload;
+        _documentCorreccion = documentCorreccion;
         _pendingRetry = pendingRetry;
         _options = options.Value;
     }
@@ -111,6 +114,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
             var channelName = Path.GetFileName(channelDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
             EnsureProcessedAndCancelledFolders(channelDir);
+            await ProcessCorrectionFolderAsync(root, channelDir, channelName, cancellationToken).ConfigureAwait(false);
 
             IEnumerable<string> filesInChannel;
             try
@@ -580,8 +584,173 @@ public sealed class FolderUploadBackgroundService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "No se pudieron crear carpetas PROCESADOS/CANCELADOS bajo {Channel}", channelDir);
+            _logger.LogWarning(ex, "No se pudieron crear carpetas PROCESADOS/CORRECCION bajo {Channel}", channelDir);
         }
+    }
+
+    private async Task ProcessCorrectionFolderAsync(
+        string root,
+        string channelDir,
+        string channelName,
+        CancellationToken cancellationToken)
+    {
+        var correctionDir = Path.Combine(channelDir, _options.FailureSubfolder);
+        if (!Directory.Exists(correctionDir))
+            return;
+
+        IEnumerable<string> files;
+        try
+        {
+            files = Directory.EnumerateFiles(correctionDir, _options.FileSearchPattern, SearchOption.TopDirectoryOnly)
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo listar archivos en CORRECCION: {Path}", correctionDir);
+            return;
+        }
+
+        var processedDir = Path.Combine(channelDir, _options.SuccessSubfolder);
+        Directory.CreateDirectory(processedDir);
+
+        foreach (var fullPath in files)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var originalName = Path.GetFileName(fullPath);
+            var sourceRelative = Path.GetRelativePath(root, fullPath);
+            PaymentFileNameParser.TryParse(originalName, out var agency, out var order);
+
+            _logger.LogInformation(
+                "Corrección: procesando {File} en {CorrectionDir} (canal {Channel})",
+                originalName,
+                correctionDir,
+                channelName);
+
+            var result = await _documentCorreccion.TryDisableByPathDocumentAsync(originalName, cancellationToken).ConfigureAwait(false);
+
+            switch (result.Status)
+            {
+                case DocumentByFileCorreccionStatus.Disabled:
+                    _logger.LogInformation(
+                        "Corrección: PathDocument={PathDocument} desactivado en documentbyfile (filas={Rows})",
+                        originalName,
+                        result.RowsAffected);
+                    break;
+                case DocumentByFileCorreccionStatus.AlreadyDisabled:
+                    _logger.LogInformation(
+                        "Corrección: PathDocument={PathDocument} ya estaba deshabilitado (Enabled=0)",
+                        originalName);
+                    break;
+                case DocumentByFileCorreccionStatus.NotFound:
+                    _logger.LogWarning(
+                        "Corrección: sin fila en documentbyfile para PathDocument={PathDocument}; archivo permanece en CORRECCION",
+                        originalName);
+                    await _obtainLog.WriteAsync(
+                        new FileObtainedLogEntry(
+                            originalName,
+                            sourceRelative,
+                            channelName,
+                            agency,
+                            order,
+                            ObtainOutcomes.CorreccionFailed,
+                            $"PathDocument={originalName}; estado=NotFound",
+                            null),
+                        cancellationToken).ConfigureAwait(false);
+                    continue;
+                case DocumentByFileCorreccionStatus.Failed:
+                    _logger.LogError(
+                        "Corrección: error MySQL para PathDocument={PathDocument}: {Detail}",
+                        originalName,
+                        result.ErrorDetail);
+                    await _obtainLog.WriteAsync(
+                        new FileObtainedLogEntry(
+                            originalName,
+                            sourceRelative,
+                            channelName,
+                            agency,
+                            order,
+                            ObtainOutcomes.CorreccionFailed,
+                            $"PathDocument={originalName}; estado=Failed; {result.ErrorDetail}",
+                            null),
+                        cancellationToken).ConfigureAwait(false);
+                    continue;
+            }
+
+            var destName = CorreccionFileNaming.ToCorrectedProcessedFileName(originalName);
+            try
+            {
+                var destPath = MoveToDestinationWithFileName(fullPath, processedDir, destName);
+                var finalName = Path.GetFileName(destPath);
+                var detail =
+                    $"PathDocument={originalName}; destino={finalName}; filas={result.RowsAffected}; estado={result.Status}";
+                _logger.LogInformation(
+                    "Corrección: {Original} desactivado en documentbyfile (Enabled=0), movido a PROCESADOS como {DestName} ({DestPath})",
+                    originalName,
+                    finalName,
+                    destPath);
+
+                await _obtainLog.WriteAsync(
+                    new FileObtainedLogEntry(
+                        originalName,
+                        sourceRelative,
+                        channelName,
+                        agency,
+                        order,
+                        ObtainOutcomes.CorreccionProcessed,
+                        detail,
+                        null),
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Corrección: no se pudo mover {File} a PROCESADOS como {DestName}",
+                    originalName,
+                    destName);
+                await _obtainLog.WriteAsync(
+                    new FileObtainedLogEntry(
+                        originalName,
+                        sourceRelative,
+                        channelName,
+                        agency,
+                        order,
+                        ObtainOutcomes.CorreccionFailed,
+                        $"PathDocument={originalName}; destino={destName}; moveError={ex.Message}",
+                        null),
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Mueve a destino con nombre fijo; si existe, añade _0001 antes de la extensión.
+    /// </summary>
+    private static string MoveToDestinationWithFileName(string sourcePath, string destinationDirectory, string destFileName)
+    {
+        Directory.CreateDirectory(destinationDirectory);
+        var dest = Path.Combine(destinationDirectory, destFileName);
+        if (!File.Exists(dest))
+        {
+            File.Move(sourcePath, dest, overwrite: false);
+            return dest;
+        }
+
+        var stem = Path.GetFileNameWithoutExtension(destFileName);
+        var ext = Path.GetExtension(destFileName);
+        for (var i = 1; i < 10_000; i++)
+        {
+            var altName = $"{stem}_{i:0000}{ext}";
+            var alt = Path.Combine(destinationDirectory, altName);
+            if (!File.Exists(alt))
+            {
+                File.Move(sourcePath, alt, overwrite: false);
+                return alt;
+            }
+        }
+
+        throw new IOException($"No se encontró nombre libre en PROCESADOS para: {destFileName}");
     }
 
     /// <summary>

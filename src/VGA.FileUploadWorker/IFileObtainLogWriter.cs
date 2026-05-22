@@ -18,6 +18,10 @@ public static class ObtainOutcomes
     public const string BlockedDocumentByFileInsert = "BlockedDocumentByFileInsert";
     /// <summary>Archivo en PROCESADOS pero falló la subida al API Backblaze.</summary>
     public const string FailedBackblazeUpload = "FailedBackblazeUpload";
+    /// <summary>Archivo en CORRECCION: documentbyfile desactivado y movido a PROCESADOS con sufijo _C.</summary>
+    public const string CorreccionProcessed = "CorreccionProcessed";
+    /// <summary>Archivo en CORRECCION sin poder completar desactivación o movimiento.</summary>
+    public const string CorreccionFailed = "CorreccionFailed";
 }
 
 public sealed record FileObtainedLogEntry(
