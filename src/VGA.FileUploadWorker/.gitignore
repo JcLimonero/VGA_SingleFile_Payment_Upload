@@ -5,6 +5,7 @@
 [Ll]ogs/
 [Dd]ist/
 [Aa]rtifacts/
+bin/
 *.cache
 project.lock.json
 project.fragment.lock.json
@@ -62,12 +63,3 @@ $RECYCLE.BIN/
 *.temp
 *.swp
 *~
-/src/VGA.FileUploadWorker/bin/Debug/net8.0/Data/dealer-folder-tree.json
-/src/VGA.FileUploadWorker/obj/project.assets.json
-/src/VGA.FileUploadWorker/obj/project.nuget.cache
-/src/VGA.FileUploadWorker/obj/VGA.FileUploadWorker.csproj.nuget.dgspec.json
-/src/VGA.FileUploadWorker/obj/VGA.FileUploadWorker.csproj.nuget.g.props
-/src/VGA.FileUploadWorker/bin/Debug/net8.0/appsettings.Development.json
-/src/VGA.FileUploadWorker/bin/Debug/net8.0/appsettings.json
-/src/VGA.FileUploadWorker/bin/Debug/net8.0/VGA.FileUploadWorker.deps.json
-/src/VGA.FileUploadWorker/bin/Debug/net8.0/VGA.FileUploadWorker.runtimeconfig.json
