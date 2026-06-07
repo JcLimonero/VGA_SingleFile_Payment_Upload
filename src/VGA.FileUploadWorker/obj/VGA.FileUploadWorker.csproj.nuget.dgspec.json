@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj": {}
+    "D:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj": {}
   },
   "projects": {
-    "d:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj": {
+    "D:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj",
+        "projectUniqueName": "D:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj",
         "projectName": "VGA.FileUploadWorker",
-        "projectPath": "d:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj",
+        "projectPath": "D:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj",
         "packagesPath": "C:\\Users\\JCLimon\\.nuget\\packages\\",
-        "outputPath": "d:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\obj\\",
+        "outputPath": "D:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -31,7 +31,6 @@
         },
         "frameworks": {
           "net7.0": {
-            "framework": "net7.0",
             "targetAlias": "net7.0",
             "projectReferences": {}
           }
@@ -46,11 +45,10 @@
           "auditLevel": "low",
           "auditMode": "direct"
         },
-        "SdkAnalysisLevel": "10.0.300"
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
         "net7.0": {
-          "framework": "net7.0",
           "targetAlias": "net7.0",
           "dependencies": {
             "Microsoft.Data.Sqlite": {
@@ -106,7 +104,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.314\\RuntimeIdentifierGraph.json"
         }
       }
     }

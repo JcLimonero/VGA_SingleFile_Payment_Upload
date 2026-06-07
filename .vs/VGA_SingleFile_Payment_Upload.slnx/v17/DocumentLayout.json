@@ -19,12 +19,12 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "VGA.FileUploadWorker",
+              "Title": "VGA.FileUploadWorker.csproj",
               "DocumentMoniker": "D:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj",
               "RelativeDocumentMoniker": "src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj",
               "ToolTip": "D:\\Developer\\VGA_SingleFile_Payment_Upload\\VGA_SingleFile_Payment_Upload\\src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj",
               "RelativeToolTip": "src\\VGA.FileUploadWorker\\VGA.FileUploadWorker.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABkAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABsAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
               "WhenOpened": "2026-05-13T06:56:26.228Z",
               "EditorCaption": ""
