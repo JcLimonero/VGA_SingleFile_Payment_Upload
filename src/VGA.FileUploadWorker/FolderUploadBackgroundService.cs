@@ -633,7 +633,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
     }
 
     /// <summary>
-    /// Bajo cada EFECTIVO/TPV deben existir las carpetas de éxito y fallo; si faltan, se crean.
+    /// Bajo cada canal (EFECTIVO, TPV, DB, etc.) deben existir las carpetas de éxito y fallo; si faltan, se crean.
     /// </summary>
     private void EnsureProcessedAndCancelledFolders(string channelDir)
     {

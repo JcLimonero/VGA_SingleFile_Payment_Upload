@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS DocumentPaymentUpload (
     SourceRelativePath VARCHAR(1024) NOT NULL
         COMMENT 'Ruta relativa a la raíz de escaneo; clave estable con el worker y reintentos',
     Channel VARCHAR(128) NOT NULL
-        COMMENT 'Carpeta de canal (p. ej. EFECTIVO, TPV)',
+        COMMENT 'Carpeta de canal (p. ej. EFECTIVO, TPV, DB)',
     OriginalFileName VARCHAR(512) NOT NULL
         COMMENT 'Nombre del fichero al detectarlo (sin directorio)',
     AgencyAbbreviation VARCHAR(64) NULL

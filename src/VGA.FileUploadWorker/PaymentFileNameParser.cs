@@ -1,7 +1,7 @@
 namespace VGA.FileUploadWorker;
 
 /// <summary>
-/// Nombres en EFECTIVO/TPV:
+/// Nombres en carpetas de canal (EFECTIVO, TPV, DB, etc.):
 /// legacy <c>Acu_7399_23.pdf</c> → agencia Acu, pedido 7399;
 /// multi-pedido <c>Acu_(1,2,3)_data.pdf</c> → agencia Acu, pedidos 1, 2, 3.
 /// </summary>
