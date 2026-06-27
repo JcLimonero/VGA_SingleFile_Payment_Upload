@@ -7,7 +7,7 @@ public sealed class BackblazeUploadOptions
     public bool Enabled { get; set; }
 
     /// <summary>URL completa del endpoint POST multipart.</summary>
-    public string UploadUrl { get; set; } = "https://apisvanguardia.com:400/backblaze/upload";
+    public string UploadUrl { get; set; } = "http://192.168.190.140:455/backblaze/upload";
 
     public int TimeoutSeconds { get; set; } = 300;
 

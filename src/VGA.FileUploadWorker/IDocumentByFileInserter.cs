@@ -10,4 +10,7 @@ public interface IDocumentByFileInserter
         string pathDocumentFileName,
         long idFile,
         CancellationToken cancellationToken);
+
+    /// <summary>Elimina una fila insertada si falla un paso posterior (p. ej. Backblaze).</summary>
+    Task TryDeleteByIdAsync(long documentByFileId, CancellationToken cancellationToken);
 }

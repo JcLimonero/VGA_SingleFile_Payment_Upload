@@ -322,9 +322,10 @@ public sealed class FolderUploadBackgroundService : BackgroundService
             }
         }
 
-        if (successfulLookups.Count == 0)
+        if (missingOrders.Count > 0 || successfulLookups.Count == 0)
         {
-            foreach (var order in allOrders)
+            var ordersToLog = missingOrders.Count > 0 ? missingOrders : allOrders;
+            foreach (var order in ordersToLog)
             {
                 _logger.LogInformation(
                     "Sin fila en vista para abbreviation={Agency} order_dms={Order}; archivo sin mover: {File}",
@@ -339,7 +340,9 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                         agency,
                         order,
                         ObtainOutcomes.PendingNoRelatedRow,
-                        "No existe registro en view_upload_documents_relation para esta agencia y pedido.",
+                        missingOrders.Count > 0
+                            ? "Faltan pedidos en view_upload_documents_relation; archivo no movido."
+                            : "No existe registro en view_upload_documents_relation para esta agencia y pedido.",
                         null),
                     cancellationToken).ConfigureAwait(false);
             }
@@ -350,10 +353,13 @@ public sealed class FolderUploadBackgroundService : BackgroundService
 
         byte[]? bytes = null;
         byte[]? hash = null;
-        var processedOrders = new List<(OrderLookupSuccess Lookup, long? TrackingId, long DocumentByFileId)>();
+        long? uploadId = null;
+        var insertedOrders = new List<(OrderLookupSuccess Lookup, long? TrackingId, long DocumentByFileId)>();
 
         for (var attempt = 1; attempt <= 5; attempt++)
         {
+            insertedOrders.Clear();
+            uploadId = null;
             try
             {
                 await using (var fs = new FileStream(
@@ -376,7 +382,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                 }
 
                 var size = new FileInfo(fullPath).Length;
-                var uploadId = await _repository.InsertUploadAsync(
+                uploadId = await _repository.InsertUploadAsync(
                     name,
                     sourceRelativePath,
                     channel,
@@ -387,7 +393,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                     hash,
                     cancellationToken).ConfigureAwait(false);
 
-                var (destPath, destFileName) = ResolveProcessedDestination(fullPath, successDir, uploadId);
+                var (destPath, destFileName) = ResolveProcessedDestination(fullPath, successDir, uploadId.Value);
 
                 foreach (var lookup in successfulLookups)
                 {
@@ -398,7 +404,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                         agency,
                         lookup.OrderNumber,
                         lookup.IdFile,
-                        uploadId,
+                        uploadId.Value,
                         cancellationToken).ConfigureAwait(false);
 
                     var insertResult = await _documentByFile.TryInsertAsync(
@@ -407,16 +413,24 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                         lookup.IdFile,
                         cancellationToken).ConfigureAwait(false);
 
-                    if (!insertResult.Ok)
+                    if (!insertResult.Ok || !insertResult.DocumentByFileId.HasValue)
                     {
+                        var detail = !insertResult.Ok
+                            ? "No se pudo insertar en documentbyfile (MySQL)."
+                            : "Insert en documentbyfile sin Id devuelto.";
                         if (trackingId.HasValue)
                         {
                             await _documentPaymentUpload.MarkProcessFailedAsync(
                                 trackingId.Value,
-                                "No se pudo insertar en documentbyfile (MySQL).",
+                                detail,
                                 cancellationToken).ConfigureAwait(false);
                         }
 
+                        await RollbackPartialImportAsync(
+                            uploadId.Value,
+                            insertedOrders,
+                            detail,
+                            cancellationToken).ConfigureAwait(false);
                         await _obtainLog.WriteAsync(
                             new FileObtainedLogEntry(
                                 name,
@@ -425,41 +439,17 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                                 agency,
                                 lookup.OrderNumber,
                                 ObtainOutcomes.BlockedDocumentByFileInsert,
-                                "No se pudo insertar en documentbyfile (MySQL).",
-                                uploadId),
+                                detail,
+                                null),
                             cancellationToken).ConfigureAwait(false);
-                        continue;
+                        await _pendingRetry.ScheduleRetryAsync(
+                            sourceRelativePath,
+                            ObtainOutcomes.BlockedDocumentByFileInsert,
+                            cancellationToken).ConfigureAwait(false);
+                        return;
                     }
 
-                    if (!insertResult.DocumentByFileId.HasValue)
-                    {
-                        if (trackingId.HasValue)
-                        {
-                            await _documentPaymentUpload.MarkProcessFailedAsync(
-                                trackingId.Value,
-                                "Insert en documentbyfile sin Id devuelto.",
-                                cancellationToken).ConfigureAwait(false);
-                        }
-
-                        _logger.LogError(
-                            "documentbyfile insertó sin devolver Id para pedido {Order}; archivo {File}",
-                            lookup.OrderNumber,
-                            name);
-                        await _obtainLog.WriteAsync(
-                            new FileObtainedLogEntry(
-                                name,
-                                sourceRelativePath,
-                                channel,
-                                agency,
-                                lookup.OrderNumber,
-                                ObtainOutcomes.BlockedDocumentByFileInsert,
-                                "Insert en documentbyfile sin Id devuelto.",
-                                uploadId),
-                            cancellationToken).ConfigureAwait(false);
-                        continue;
-                    }
-
-                    processedOrders.Add((lookup, trackingId, insertResult.DocumentByFileId.Value));
+                    insertedOrders.Add((lookup, trackingId, insertResult.DocumentByFileId.Value));
                     if (trackingId.HasValue)
                     {
                         await _documentPaymentUpload.MarkDocumentByFileAsync(
@@ -469,12 +459,87 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                     }
                 }
 
+                if (_backblazeOptions.CurrentValue.Enabled)
+                {
+                    foreach (var (lookup, trackingId, documentByFileId) in insertedOrders)
+                    {
+                        _logger.LogInformation(
+                            "Enviando archivo por API Backblaze: ruta={Path}, idSingleFile={IdFile}, idDocumentFile={IdDoc}, pedido={Order}",
+                            fullPath,
+                            lookup.IdFile,
+                            documentByFileId,
+                            lookup.OrderNumber);
+                        if (trackingId.HasValue)
+                        {
+                            await _documentPaymentUpload.NotifyCloudAttemptStartingAsync(trackingId.Value, cancellationToken).ConfigureAwait(false);
+                        }
+
+                        var (uploadOk, uploadErr) = await _backblazeUpload
+                            .UploadAsync(fullPath, lookup.IdFile, documentByFileId, cancellationToken)
+                            .ConfigureAwait(false);
+
+                        if (!uploadOk)
+                        {
+                            _logger.LogError(
+                                "Fallo subida Backblaze para {File}, pedido={Order}: {Detail}; archivo no movido",
+                                name,
+                                lookup.OrderNumber,
+                                uploadErr);
+                            if (trackingId.HasValue)
+                            {
+                                await _documentPaymentUpload.MarkCloudOutcomeAsync(
+                                    trackingId.Value,
+                                    false,
+                                    uploadErr,
+                                    cancellationToken).ConfigureAwait(false);
+                            }
+
+                            await RollbackPartialImportAsync(
+                                uploadId.Value,
+                                insertedOrders,
+                                uploadErr ?? "Fallo subida Backblaze.",
+                                cancellationToken).ConfigureAwait(false);
+                            await _obtainLog.WriteAsync(
+                                new FileObtainedLogEntry(
+                                    name,
+                                    sourceRelativePath,
+                                    channel,
+                                    agency,
+                                    lookup.OrderNumber,
+                                    ObtainOutcomes.FailedBackblazeUpload,
+                                    uploadErr,
+                                    null),
+                                cancellationToken).ConfigureAwait(false);
+                            await _pendingRetry.ScheduleRetryAsync(
+                                sourceRelativePath,
+                                ObtainOutcomes.FailedBackblazeUpload,
+                                cancellationToken).ConfigureAwait(false);
+                            return;
+                        }
+
+                        if (trackingId.HasValue)
+                        {
+                            await _documentPaymentUpload.MarkCloudOutcomeAsync(
+                                trackingId.Value,
+                                true,
+                                null,
+                                cancellationToken).ConfigureAwait(false);
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "BackblazeUpload.Enabled=false: no se llama al API; archivo solo en disco tras mover: {File}",
+                        name);
+                }
+
                 File.Move(fullPath, destPath, overwrite: false);
                 var storedAs = destPath;
                 _logger.LogInformation("Archivo guardado en PROCESADOS como {StoredName}", Path.GetFileName(storedAs));
                 await _pendingRetry.ClearAsync(sourceRelativePath, cancellationToken).ConfigureAwait(false);
 
-                foreach (var (lookup, trackingId, documentByFileId) in processedOrders)
+                foreach (var (lookup, trackingId, documentByFileId) in insertedOrders)
                 {
                     if (trackingId.HasValue)
                     {
@@ -486,50 +551,8 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                     }
 
                     var importDetail = $"Guardado como: {Path.GetFileName(storedAs)}; pedido={lookup.OrderNumber}";
-                    var outcome = ObtainOutcomes.Imported;
                     if (_backblazeOptions.CurrentValue.Enabled)
-                    {
-                        _logger.LogInformation(
-                            "Enviando archivo por API Backblaze: ruta={Path}, idSingleFile={IdFile}, idDocumentFile={IdDoc}, pedido={Order}",
-                            storedAs,
-                            lookup.IdFile,
-                            documentByFileId,
-                            lookup.OrderNumber);
-                        if (trackingId.HasValue)
-                        {
-                            await _documentPaymentUpload.NotifyCloudAttemptStartingAsync(trackingId.Value, cancellationToken).ConfigureAwait(false);
-                        }
-
-                        var (uploadOk, uploadErr) = await _backblazeUpload
-                            .UploadAsync(destPath, lookup.IdFile, documentByFileId, cancellationToken)
-                            .ConfigureAwait(false);
-                        if (trackingId.HasValue)
-                        {
-                            await _documentPaymentUpload.MarkCloudOutcomeAsync(trackingId.Value, uploadOk, uploadErr, cancellationToken).ConfigureAwait(false);
-                        }
-
-                        if (!uploadOk)
-                        {
-                            _logger.LogError(
-                                "Fallo subida Backblaze para {File}, pedido={Order}: {Detail}",
-                                Path.GetFileName(storedAs),
-                                lookup.OrderNumber,
-                                uploadErr);
-                            outcome = ObtainOutcomes.FailedBackblazeUpload;
-                            importDetail = $"{importDetail}; Backblaze: {uploadErr}";
-                        }
-                        else
-                        {
-                            importDetail = $"{importDetail}; Backblaze: subida OK";
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogInformation(
-                            "BackblazeUpload.Enabled=false: no se llama al API; archivo solo en disco: {File}, pedido={Order}",
-                            Path.GetFileName(storedAs),
-                            lookup.OrderNumber);
-                    }
+                        importDetail = $"{importDetail}; Backblaze: subida OK";
 
                     await _obtainLog.WriteAsync(
                         new FileObtainedLogEntry(
@@ -538,28 +561,8 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                             channel,
                             agency,
                             lookup.OrderNumber,
-                            outcome,
+                            ObtainOutcomes.Imported,
                             importDetail,
-                            uploadId),
-                        cancellationToken).ConfigureAwait(false);
-                }
-
-                foreach (var missingOrder in missingOrders)
-                {
-                    _logger.LogInformation(
-                        "Pedido omitido (sin fila en vista): abbreviation={Agency} order_dms={Order}; archivo ya movido: {File}",
-                        agency,
-                        missingOrder,
-                        sourceRelativePath);
-                    await _obtainLog.WriteAsync(
-                        new FileObtainedLogEntry(
-                            name,
-                            sourceRelativePath,
-                            channel,
-                            agency,
-                            missingOrder,
-                            ObtainOutcomes.PendingNoRelatedRow,
-                            "No existe registro en view_upload_documents_relation para esta agencia y pedido; archivo ya procesado para otros pedidos.",
                             uploadId),
                         cancellationToken).ConfigureAwait(false);
                 }
@@ -568,26 +571,26 @@ public sealed class FolderUploadBackgroundService : BackgroundService
             }
             catch (IOException) when (attempt < 5)
             {
-                processedOrders.Clear();
+                if (uploadId.HasValue)
+                    await RollbackPartialImportAsync(uploadId.Value, insertedOrders, "Error de E/S al leer.", cancellationToken).ConfigureAwait(false);
+                insertedOrders.Clear();
+                uploadId = null;
                 await Task.Delay(250 * attempt, cancellationToken).ConfigureAwait(false);
             }
             catch (UnauthorizedAccessException) when (attempt < 5)
             {
-                processedOrders.Clear();
+                if (uploadId.HasValue)
+                    await RollbackPartialImportAsync(uploadId.Value, insertedOrders, "Acceso denegado al leer.", cancellationToken).ConfigureAwait(false);
+                insertedOrders.Clear();
+                uploadId = null;
                 await Task.Delay(250 * attempt, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Fallo al procesar {File}; se moverá a {Folder}.", sourceRelativePath, _options.FailureSubfolder);
-                try
-                {
-                    MoveWithUniqueName(fullPath, failureDir);
-                }
-                catch (Exception moveEx)
-                {
-                    _logger.LogError(moveEx, "No se pudo mover el archivo en error: {File}", name);
-                }
+                if (uploadId.HasValue)
+                    await RollbackPartialImportAsync(uploadId.Value, insertedOrders, ex.Message, cancellationToken).ConfigureAwait(false);
 
+                _logger.LogError(ex, "Fallo al procesar {File}; archivo permanece en el canal.", sourceRelativePath);
                 await _obtainLog.WriteAsync(
                     new FileObtainedLogEntry(
                         name,
@@ -599,6 +602,7 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                         ex.Message,
                         null),
                     cancellationToken).ConfigureAwait(false);
+                await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.Failed, cancellationToken).ConfigureAwait(false);
                 return;
             }
         }
@@ -616,6 +620,28 @@ public sealed class FolderUploadBackgroundService : BackgroundService
                 null),
             cancellationToken).ConfigureAwait(false);
         await _pendingRetry.ScheduleRetryAsync(sourceRelativePath, ObtainOutcomes.ReadRetriesExhausted, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task RollbackPartialImportAsync(
+        long uploadId,
+        IReadOnlyList<(OrderLookupSuccess Lookup, long? TrackingId, long DocumentByFileId)> inserted,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        foreach (var (_, trackingId, documentByFileId) in inserted)
+        {
+            if (trackingId.HasValue)
+            {
+                await _documentPaymentUpload.MarkProcessFailedAsync(
+                    trackingId.Value,
+                    reason,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            await _documentByFile.TryDeleteByIdAsync(documentByFileId, cancellationToken).ConfigureAwait(false);
+        }
+
+        await _repository.DeleteUploadByIdAsync(uploadId, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<byte[]> ReadAllAsync(Stream stream, CancellationToken cancellationToken)

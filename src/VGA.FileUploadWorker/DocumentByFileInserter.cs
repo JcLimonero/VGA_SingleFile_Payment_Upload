@@ -129,6 +129,32 @@ public sealed class DocumentByFileInserter : IDocumentByFileInserter
         }
     }
 
+    public async Task TryDeleteByIdAsync(long documentByFileId, CancellationToken cancellationToken)
+    {
+        var cs = _mysqlConnection.GetConnectionString();
+        if (string.IsNullOrWhiteSpace(cs))
+            return;
+
+        var table = _docOptions.CurrentValue.TableName.Trim();
+        var idCol = _docOptions.CurrentValue.IdColumnName.Trim();
+        if (!SafeIdentifier.IsMatch(table) || !SafeIdentifier.IsMatch(idCol))
+            return;
+
+        var sql = $"""DELETE FROM `{table}` WHERE `{idCol}` = @id LIMIT 1;""";
+        try
+        {
+            await using var conn = new MySqlConnection(cs);
+            await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var cmd = new MySqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@id", documentByFileId);
+            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo revertir documentbyfile Id={Id}", documentByFileId);
+        }
+    }
+
     /// <summary>Vacío, "0" o no numérico → NULL (evita FK a documentfile_error con Id inexistente).</summary>
     private static object ResolveIdDocumentErrorParameter(DocumentByFileMysqlOptions o)
     {
