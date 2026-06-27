@@ -10,4 +10,6 @@ public interface IPendingImportRetryStore
 
     /// <summary>Quita la espera al importar con éxito (archivo ya en PROCESADOS).</summary>
     Task ClearAsync(string sourceRelativePath, CancellationToken cancellationToken);
+
+    Task<string?> GetLastOutcomeAsync(string sourceRelativePath, CancellationToken cancellationToken);
 }

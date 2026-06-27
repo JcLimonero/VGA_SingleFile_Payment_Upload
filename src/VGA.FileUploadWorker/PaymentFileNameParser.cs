@@ -35,6 +35,12 @@ public static class PaymentFileNameParser
         if (!TryParseOrderSegment(parts[1], out var orders))
             return false;
 
+        orders = orders
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (orders.Count == 0)
+            return false;
+
         info = new PaymentFileNameInfo(agency, orders);
         return true;
     }

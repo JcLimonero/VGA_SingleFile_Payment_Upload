@@ -87,4 +87,25 @@ public sealed class SqlitePendingImportRetryStore : IPendingImportRetryStore
             _logger.LogWarning(ex, "No se pudo limpiar stalled_import_path para {Path}", sourceRelativePath);
         }
     }
+
+    public async Task<string?> GetLastOutcomeAsync(string sourceRelativePath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conn = new SqliteConnection(_sqlite.ConnectionString);
+            await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT last_outcome FROM stalled_import_path WHERE source_relative_path = @p LIMIT 1;
+                """;
+            cmd.Parameters.AddWithValue("@p", sourceRelativePath);
+            var scalar = await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            return scalar is null or DBNull ? null : (string)scalar;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo leer last_outcome para {Path}", sourceRelativePath);
+            return null;
+        }
+    }
 }

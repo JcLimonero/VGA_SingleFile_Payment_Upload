@@ -1,5 +1,12 @@
 namespace VGA.FileUploadWorker;
 
+public sealed record AwaitingMoveRow(
+    long TrackingId,
+    string OrderNumber,
+    string? AgencyAbbreviation,
+    long PaymentUploadId,
+    string FinalFileName);
+
 public interface IDocumentPaymentUploadTracker
 {
     Task<long?> InsertRowAfterSqliteAsync(
@@ -21,4 +28,10 @@ public interface IDocumentPaymentUploadTracker
     Task NotifyCloudAttemptStartingAsync(long trackingId, CancellationToken cancellationToken);
 
     Task MarkCloudOutcomeAsync(long trackingId, bool success, string? errorDetail, CancellationToken cancellationToken);
+
+    Task MarkAwaitingMoveAsync(long trackingId, string finalFileName, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<AwaitingMoveRow>> GetAwaitingMoveRowsAsync(
+        string sourceRelativePath,
+        CancellationToken cancellationToken);
 }

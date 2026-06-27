@@ -22,6 +22,8 @@ public static class ObtainOutcomes
     public const string CorreccionProcessed = "CorreccionProcessed";
     /// <summary>Archivo en CORRECCION sin poder completar desactivación o movimiento.</summary>
     public const string CorreccionFailed = "CorreccionFailed";
+    /// <summary>Backblaze OK pero falló mover a PROCESADOS; se reintenta solo el move.</summary>
+    public const string PendingMove = "PendingMove";
 }
 
 public sealed record FileObtainedLogEntry(

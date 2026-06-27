@@ -182,6 +182,74 @@ public sealed class DocumentPaymentUploadTracker : IDocumentPaymentUploadTracker
                 },
                 cancellationToken);
 
+    public Task MarkAwaitingMoveAsync(long trackingId, string finalFileName, CancellationToken cancellationToken) =>
+        ExecuteUpdateAsync(
+            trackingId,
+            """
+            UPDATE `{0}` SET FinalFileName = @fn, UpdatedUtc = @u WHERE Id = @id;
+            """,
+            cmd =>
+            {
+                cmd.Parameters.AddWithValue("@fn", Truncate(finalFileName, 512));
+                cmd.Parameters.Add("@u", MySqlDbType.DateTime).Value = DateTime.UtcNow;
+                cmd.Parameters.AddWithValue("@id", trackingId);
+            },
+            cancellationToken);
+
+    public async Task<IReadOnlyList<AwaitingMoveRow>> GetAwaitingMoveRowsAsync(
+        string sourceRelativePath,
+        CancellationToken cancellationToken)
+    {
+        var o = _options.CurrentValue;
+        if (!o.Enabled)
+            return Array.Empty<AwaitingMoveRow>();
+
+        var table = o.TableName.Trim();
+        if (!SafeIdentifier.IsMatch(table))
+            return Array.Empty<AwaitingMoveRow>();
+
+        var cs = _mysqlConnection.GetConnectionString();
+        if (string.IsNullOrWhiteSpace(cs))
+            return Array.Empty<AwaitingMoveRow>();
+
+        var sql = $"""
+            SELECT Id, OrderNumber, AgencyAbbreviation, PaymentUploadId, FinalFileName
+            FROM `{table}`
+            WHERE SourceRelativePath = @rel
+              AND ProcessSucceeded = 0
+              AND CloudUploadSucceeded = 1
+              AND DocumentByFileId IS NOT NULL
+              AND FinalFileName IS NOT NULL
+              AND FinalFileName <> ''
+            ORDER BY Id;
+            """;
+
+        var rows = new List<AwaitingMoveRow>();
+        try
+        {
+            await using var conn = new MySqlConnection(cs);
+            await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var cmd = new MySqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@rel", Truncate(sourceRelativePath, 1024));
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                rows.Add(new AwaitingMoveRow(
+                    reader.GetInt64(0),
+                    reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.GetInt64(3),
+                    reader.GetString(4)));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "DocumentPaymentUpload: error al leer filas pendientes de move para {Path}", sourceRelativePath);
+        }
+
+        return rows;
+    }
+
     private async Task ExecuteUpdateAsync(
         long trackingId,
         string sqlTemplate,
