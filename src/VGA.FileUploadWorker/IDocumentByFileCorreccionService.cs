@@ -6,4 +6,9 @@ public interface IDocumentByFileCorreccionService
     Task<DocumentByFileCorreccionResult> TryDisableByPathDocumentAsync(
         string pathDocumentFileName,
         CancellationToken cancellationToken);
+
+    /// <summary>Desactiva una fila en documentbyfile por PK (Enabled → 0).</summary>
+    Task<DocumentByFileCorreccionResult> TryDisableByIdAsync(
+        long documentByFileId,
+        CancellationToken cancellationToken);
 }

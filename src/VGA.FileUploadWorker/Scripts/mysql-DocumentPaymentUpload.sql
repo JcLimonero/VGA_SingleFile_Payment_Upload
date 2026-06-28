@@ -1,6 +1,12 @@
 -- Seguimiento por intento: detección post-SQLite → proceso local → subida API (Backblaze).
 -- Ejecutar en la misma base que documentbyfile (p. ej. single_file).
 -- Sin UNIQUE en SourceRelativePath: un mismo path puede generar varias filas en reintentos.
+--
+-- Recuperación de intentos fallidos (CloudLastError):
+--   1. Detener el servicio Windows VGA Single File Payment Upload.
+--   2. Vista previa:  VGA.FileUploadWorker.exe recover-failed-uploads [--channel DB] [--error-contains apisvanguardia]
+--   3. Ejecutar:     VGA.FileUploadWorker.exe recover-failed-uploads ... --execute [--yes]
+--   4. Verificar BackblazeUpload:UploadUrl (red interna) antes de reiniciar el servicio.
 
 CREATE TABLE IF NOT EXISTS DocumentPaymentUpload (
     Id BIGINT NOT NULL AUTO_INCREMENT

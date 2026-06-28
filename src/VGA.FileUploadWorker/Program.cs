@@ -10,6 +10,12 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
+    if (args.Length > 0 && string.Equals(args[0], FailedUploadRecoveryCli.CommandName, StringComparison.OrdinalIgnoreCase))
+    {
+        var exitCode = await FailedUploadRecoveryCli.RunAsync(args[1..], CancellationToken.None).ConfigureAwait(false);
+        Environment.Exit(exitCode);
+    }
+
     var builder = Host.CreateApplicationBuilder(args);
 
     builder.Services.AddSerilog((services, loggerConfiguration) =>
@@ -38,6 +44,7 @@ try
     builder.Services.AddSingleton<IDocumentPaymentUploadTracker, DocumentPaymentUploadTracker>();
     builder.Services.AddSingleton<IDocumentByFileInserter, DocumentByFileInserter>();
     builder.Services.AddSingleton<IDocumentByFileCorreccionService, DocumentByFileCorreccionService>();
+    builder.Services.AddSingleton<IDocumentPaymentUploadQueryService, DocumentPaymentUploadQueryService>();
     builder.Services.AddSingleton<ImportRollbackService>();
     builder.Services.AddSingleton<PaymentFileImportService>();
     builder.Services.AddSingleton<CorrectionFolderProcessor>();
