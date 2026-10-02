@@ -12,14 +12,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -31,14 +38,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -55,14 +69,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -79,14 +100,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -98,14 +126,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -117,14 +152,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -136,14 +178,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -160,14 +209,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -179,14 +235,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -198,14 +261,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -222,14 +292,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -241,14 +318,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -265,14 +349,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -284,14 +375,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -303,14 +401,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -327,14 +432,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -346,14 +458,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }
@@ -363,7 +482,8 @@
           "name": "VGA",
           "children": [
             { "name": "EFECTIVO", "children": [] },
-            { "name": "TPV", "children": [] }
+            { "name": "TPV", "children": [] },
+            { "name": "DB", "children": [] }
           ]
         },
         {
@@ -372,14 +492,21 @@
             {
               "name": "EFECTIVO",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             },
             {
               "name": "TPV",
               "children": [
-                { "name": "CANCELADOS", "children": [] },
+                { "name": "CORRECCION", "children": [] },
+                { "name": "PROCESADOS", "children": [] }
+              ]
+            },
+            {
+              "name": "DB",
+              "children": [
+                { "name": "CORRECCION", "children": [] },
                 { "name": "PROCESADOS", "children": [] }
               ]
             }

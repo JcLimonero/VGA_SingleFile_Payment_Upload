@@ -10,13 +10,15 @@ public sealed class UploadOptions
     /// <summary>
     /// Nombres de carpeta “canal” donde pueden aparecer archivos pendientes (solo en el nivel raíz de esa carpeta, no dentro de subcarpetas).
     /// </summary>
-    public List<string> ChannelFolderNames { get; set; } = ["EFECTIVO", "TPV"];
+    public List<string> ChannelFolderNames { get; set; } = new() { "EFECTIVO", "TPV", "DB" };
 
     /// <summary>Tras importar correctamente, el archivo se mueve a esta subcarpeta dentro del mismo canal.</summary>
+    /// <remarks>Se crea junto con <see cref="FailureSubfolder"/> si no existen.</remarks>
     public string SuccessSubfolder { get; set; } = "PROCESADOS";
 
     /// <summary>Si falla la importación, el archivo se mueve a esta subcarpeta dentro del mismo canal.</summary>
-    public string FailureSubfolder { get; set; } = "CANCELADOS";
+    /// <remarks>Se crea junto con <see cref="SuccessSubfolder"/> si no existen.</remarks>
+    public string FailureSubfolder { get; set; } = "CORRECCION";
 
     /// <summary>Intervalo entre escaneos (segundos).</summary>
     public int ScanIntervalSeconds { get; set; } = 10;
@@ -36,6 +38,12 @@ public sealed class UploadOptions
     /// Si es true, los archivos cuyo nombre no siga el patrón Agencia_pedido_... no se insertan en BD y van a la carpeta de fallo.
     /// </summary>
     public bool RequireValidPaymentFileName { get; set; }
+
+    /// <summary>
+    /// Minutos de espera antes de volver a intentar archivos que siguieron en el canal (vista sin fila, error MySQL, nombre sin parsear, etc.).
+    /// Los archivos nuevos (sin fila en esta tabla) se intentan en cada escaneo normal.
+    /// </summary>
+    public int RetryPendingIntervalMinutes { get; set; } = 30;
 
     public HashSet<string> ChannelNameSet(StringComparer comparer) =>
         new(ChannelFolderNames.Where(static s => !string.IsNullOrWhiteSpace(s)).Select(static s => s.Trim()), comparer);
