@@ -51,6 +51,10 @@ try
     builder.Services.Configure<UploadOptions>(builder.Configuration.GetSection(UploadOptions.SectionName));
     builder.Services.AddHostedService<FolderUploadBackgroundService>();
 
+    builder.Services.Configure<DsMonitorOptions>(builder.Configuration.GetSection(DsMonitorOptions.SectionName));
+    builder.Services.AddHttpClient<DsMonitorClient>(c => c.Timeout = TimeSpan.FromSeconds(10));
+    builder.Services.AddHostedService<HeartbeatBackgroundService>();
+
     if (OperatingSystem.IsWindows())
     {
         builder.Services.AddWindowsService(options =>
