@@ -89,9 +89,78 @@ public sealed class DocumentPaymentUploadTracker : IDocumentPaymentUploadTracker
                 return scalar is ulong u ? unchecked((long)u) : Convert.ToInt64(scalar, System.Globalization.CultureInfo.InvariantCulture);
             }
         }
+        catch (MySqlException ex) when (ex.ErrorCode == MySqlErrorCode.DuplicateKeyEntry)
+        {
+            // Red de seguridad si la tabla aún tiene un UNIQUE sobre SourceRelativePath: se reutiliza la fila existente.
+            _logger.LogWarning(
+                "DocumentPaymentUpload: ya existe fila para {Path} (índice UNIQUE); se reutiliza y se reinicia el intento.",
+                sourceRelativePath);
+            return await ReuseExistingRowAsync(
+                table, cs, sourceRelativePath, channel, originalFileName, agencyAbbreviation, orderNumber,
+                idFile, paymentUploadId, now, cancellationToken).ConfigureAwait(false);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "DocumentPaymentUpload: error al insertar fila de seguimiento para {Path}", sourceRelativePath);
+            return null;
+        }
+    }
+
+    private async Task<long?> ReuseExistingRowAsync(
+        string table,
+        string connectionString,
+        string sourceRelativePath,
+        string channel,
+        string originalFileName,
+        string? agencyAbbreviation,
+        string? orderNumber,
+        long idFile,
+        long paymentUploadId,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var conn = new MySqlConnection(connectionString);
+            await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            long existingId;
+            await using (var select = new MySqlCommand(
+                             $"SELECT Id FROM `{table}` WHERE SourceRelativePath = @rel AND IdFile = @idFile AND ProcessSucceeded = 0 ORDER BY Id DESC LIMIT 1;", conn))
+            {
+                // Solo se reutiliza un intento previo del mismo pedido y aún no terminado: así no se pisa la fila de otro
+                // pedido del mismo archivo ni el historial de un proceso ya completado.
+                select.Parameters.AddWithValue("@rel", Truncate(sourceRelativePath, 1024));
+                select.Parameters.AddWithValue("@idFile", idFile);
+                var scalar = await select.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+                if (scalar is null or DBNull)
+                    return null;
+                existingId = Convert.ToInt64(scalar, System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            var update = $"""
+                UPDATE `{table}` SET
+                    Channel = @channel, OriginalFileName = @name, AgencyAbbreviation = @agency, OrderNumber = @order,
+                    IdFile = @idFile, PaymentUploadId = @paymentId, DocumentByFileId = NULL,
+                    ProcessSucceeded = 0, ProcessedUtc = NULL, ProcessedFullPath = NULL, FinalFileName = NULL,
+                    CloudUploadSucceeded = 0, CloudUploadedUtc = NULL, CloudLastError = NULL, UpdatedUtc = @updated
+                WHERE Id = @id;
+                """;
+            await using var cmd = new MySqlCommand(update, conn);
+            cmd.Parameters.AddWithValue("@channel", Truncate(channel, 128));
+            cmd.Parameters.AddWithValue("@name", Truncate(originalFileName, 512));
+            cmd.Parameters.AddWithValue("@agency", string.IsNullOrEmpty(agencyAbbreviation) ? DBNull.Value : Truncate(agencyAbbreviation, 64));
+            cmd.Parameters.AddWithValue("@order", string.IsNullOrEmpty(orderNumber) ? DBNull.Value : Truncate(orderNumber, 128));
+            cmd.Parameters.AddWithValue("@idFile", idFile);
+            cmd.Parameters.AddWithValue("@paymentId", paymentUploadId);
+            cmd.Parameters.Add("@updated", MySqlDbType.DateTime).Value = now;
+            cmd.Parameters.AddWithValue("@id", existingId);
+            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            return existingId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "DocumentPaymentUpload: no se pudo reutilizar la fila existente para {Path}", sourceRelativePath);
             return null;
         }
     }

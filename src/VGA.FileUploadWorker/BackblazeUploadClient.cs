@@ -39,13 +39,15 @@ public sealed class BackblazeUploadClient : IBackblazeUploadClient
 
         var uri = new Uri(o.UploadUrl.Trim(), UriKind.Absolute);
         var fileName = Path.GetFileName(filePath);
+        var uploadFileName = UploadFileMetadata.ToAsciiSafeFileName(fileName);
         var fileLength = new FileInfo(filePath).Length;
         var maxAttempts = 1 + Math.Max(0, o.MaxRetries);
 
         _logger.LogInformation(
-            "POST multipart a Backblaze: {Url}, campo file (stream), nombre={FileName}, bytes={Bytes}, idSingleFile={IdSingle}, idDocumentFile={IdDoc}, intentos max={Attempts}",
+            "POST multipart a Backblaze: {Url}, campo file (stream), nombre={FileName}, nombre enviado={UploadName}, bytes={Bytes}, idSingleFile={IdSingle}, idDocumentFile={IdDoc}, intentos max={Attempts}",
             uri,
             fileName,
+            uploadFileName,
             fileLength,
             idSingleFile,
             idDocumentFile,
@@ -66,12 +68,10 @@ public sealed class BackblazeUploadClient : IBackblazeUploadClient
 
                 await using var fileStream = File.OpenRead(filePath);
                 using var streamContent = new StreamContent(fileStream);
-                var mime = GuessMimeForMultipartFile(filePath);
-                if (mime is not null)
-                    streamContent.Headers.ContentType = new MediaTypeHeaderValue(mime);
+                streamContent.Headers.ContentType = new MediaTypeHeaderValue(UploadFileMetadata.GuessMime(filePath));
 
                 using var form = new MultipartFormDataContent();
-                form.Add(streamContent, "file", fileName);
+                form.Add(streamContent, "file", uploadFileName);
                 form.Add(new StringContent(idSingleFile.ToString(CultureInfo.InvariantCulture)), "idSingleFile");
                 form.Add(new StringContent(idDocumentFile.ToString(CultureInfo.InvariantCulture)), "idDocumentFile");
                 request.Content = form;
@@ -94,7 +94,7 @@ public sealed class BackblazeUploadClient : IBackblazeUploadClient
                 var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 var detail = $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}: {Truncate(body, 500)}";
 
-                if (!ShouldRetry(response.StatusCode) || attempt == maxAttempts - 1)
+                if (!(ShouldRetry(response.StatusCode) || IsTransientBackendError(body)) || attempt == maxAttempts - 1)
                     return (false, detail);
 
                 await Task.Delay(250 * (attempt + 1), cancellationToken).ConfigureAwait(false);
@@ -124,17 +124,9 @@ public sealed class BackblazeUploadClient : IBackblazeUploadClient
     private static string Truncate(string s, int maxLen) =>
         s.Length <= maxLen ? s : s[..maxLen] + "…";
 
-    /// <summary>Similar a curl -F file=@archivo.pdf (Content-Type del part opcional).</summary>
-    private static string? GuessMimeForMultipartFile(string filePath)
-    {
-        return Path.GetExtension(filePath).ToLowerInvariant() switch
-        {
-            ".pdf" => "application/pdf",
-            ".png" => "image/png",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".xml" => "application/xml",
-            ".json" => "application/json",
-            _ => null,
-        };
-    }
+    /// <summary>El API devuelve HTTP 400 con estos mensajes cuando Backblaze falla de forma temporal.</summary>
+    public static bool IsTransientBackendError(string? body) =>
+        !string.IsNullOrEmpty(body)
+        && (body.Contains("no tomes available", StringComparison.OrdinalIgnoreCase)
+            || body.Contains("incident id", StringComparison.OrdinalIgnoreCase));
 }
